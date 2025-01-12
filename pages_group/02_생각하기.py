@@ -48,7 +48,7 @@ if not os.path.exists(".cache/files"):
 if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
-st.title("문제 살펴보기 📄")
+st.title("생각하기 🤔")
 st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 왼쪽 사이드바 캔버스에 그림을 그려보고 그 이유를 하단 박스에 적어보세요.")
 # 처음 1번만 실행하기 위한 코드
 if "messages_predict" not in st.session_state:
@@ -363,19 +363,19 @@ col1, col2, col3 = st.columns([5, 2, 3])
 # Place the button in the last column
 with col1:
     if st.button(
-        label="이전단계로 넘어가기",
+        label="이전단계로",
         icon="⏪",
-        help="도입으로 넘어가기",
+        help="들어가기로 이동하기",
         type="primary"
     ):
-        st.switch_page("도입.py")
+        st.switch_page("pages_group/01_들어가기.py")
 
 # Place the button in the last column
 with col3:
     if st.button(
-        label="다음단계로 넘어가기",
+        label="다음단계로",
         icon="⏩",
-        help="시뮬레이션(O)로 넘어가기",
+        help="실험하기로 이동하기",
         type="primary"
     ):
-        st.switch_page("pages/03_시뮬레이션(O).py")
+        st.switch_page("pages_group/03_실험하기.py")

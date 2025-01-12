@@ -29,7 +29,7 @@ if not os.path.exists(".cache"):
 store = {} 
 
 
-st.title("배운 내용 적용하기 ")
+st.title("적용하기 💡")
 st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요.")
 
 st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
@@ -296,9 +296,9 @@ col1, col2, col3 = st.columns([5, 2, 3])
 # Place the button in the last column
 with col1:
     if st.button(
-        label="이전단계로 넘어가기",
+        label="이전단계로",
         icon="⏪",
-        help="돌아보기(E)로 넘어가기",
+        help="돌아보기로 이동하기",
         type="primary"
     ):
-        st.switch_page("pages/04_돌아보기(E).py")
+        st.switch_page("pages_group/04_돌아보기.py")

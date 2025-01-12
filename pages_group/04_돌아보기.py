@@ -48,7 +48,7 @@ def disalble_submit_button():
     st.session_state["submit_button_disabled"] = True
 
 
-st.title("문제 돌아보기 ✅")
+st.title("돌아보기 🧐")
 st.info("- 왼쪽 캔버스에 최종적으로 생각한 **(1)정답**과 함께 그렇게 생각한 **(2)이유**를 적어주세요. \n - 정답을 적으면 하단 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다. \n - AI 튜터와 대화하면서 내가 잘못 알고 있던 개념은 없는지 파악하고 내 이해도를 더 정교화해보세요.")
 
 tab1, tab2 = st.tabs(["문제 상황", "문제 정답"])
@@ -310,21 +310,21 @@ col1, col2, col3 = st.columns([5, 2, 3])
 # Place the button in the last column
 with col1:
     if st.button(
-        label="이전단계로 넘어가기",
+        label="이전단계로",
         key="prev_button",
         icon="⏪",
-        help="시뮬레이션(O)으로 넘어가기",
+        help="실험하기로 이동하기",
         type="primary"
     ):
-        st.switch_page("pages/03_시뮬레이션(O).py")
+        st.switch_page("pages_group/03_실험하기.py")
 
 # Place the button in the last column
 with col3:
     if st.button(
-        label="다음단계로 넘어가기",
+        label="다음단계로",
         key="next_button",
         icon="⏩",
-        help="적용하기(A)로 넘어가기",
+        help="적용하기로 이동하기",
         type="primary"
     ):
-        st.switch_page("pages/05_적용하기(A).py")
+        st.switch_page("pages_group/05_적용하기.py")

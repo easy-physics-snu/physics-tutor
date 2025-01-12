@@ -38,7 +38,7 @@ if "tutor_messages" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
     st.session_state["tutor_messages"] = []
 
-DEFAULT_OPERATION = "자바 실험실"
+DEFAULT_OPERATION = "예비실험실"
 
 def enalble_submit_button():
     st.session_state["submit_button_disabled"] = False
@@ -78,7 +78,7 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
     return store[session_id]
 
 
-st.title("물리 시뮬레이션 실험실 🧪")
+st.title("실험하기 🧪")
 st.info("- 시뮬레이션을 관찰하고 조작해보면서, 앞에서 제출한 답과 비교해보세요. \n - 시뮬레이션에 대해서 궁금한 사항은 사이드바의 🤖AI 튜터에게 질문해보세요. \n - 시뮬레이션을 조작하면서 알게 된 사실을 사이드바 하단 박스에 적어보세요.")
 
 main_tab1 = st.container(border=True)
@@ -88,7 +88,7 @@ main_tab1.image("images/problem_1.png")
 # 모델 선택 메뉴
 selected_model = "gpt-4o-mini"
 
-default_operation = "자바 실험실"
+default_operation = "예비실험실"
 
 # 사이드바 시스템 체인 생성
 def generate_chain(model_name="gpt-4o-mini"):
@@ -106,15 +106,15 @@ def generate_chain(model_name="gpt-4o-mini"):
 
     **설명 전략:**
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 안내하세요.
-        if operation == "자바 실험실": 힘과 운동 방향의 각도를 조정하면서 원운동의 조건을 탐구해보도록 안내합니다.
+        if operation == "예비실험실": 힘과 운동 방향의 각도를 조정하면서 원운동의 조건을 탐구해보도록 안내합니다.
         elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 어떨 때 행성이 원운동이 일어날 수 있을지 조작해보도록 안내합니다.
-        elif operation == "자율실험실": 시뮬레이션 위에 있는 입력창에 내가 생각하는 힘의 방향이나 그 외 다양한 변수를 수정해보도록 안내합니다.
+        elif operation == "내 실험실": 시뮬레이션 위에 있는 입력창에 내가 생각하는 힘의 방향이나 그 외 다양한 변수를 수정해보도록 안내합니다.
 
     **핵심 개념 질문 전략:**  
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 질문하여 학생의 생각을 유도하세요.
-        if operation == "자바 실험실": 힘의 방향과 물체의 운동 궤도 사이의 관계를 탐구해보도록 유도합니다.
+        if operation == "예비실험실": 힘의 방향과 물체의 운동 궤도 사이의 관계를 탐구해보도록 유도합니다.
         elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 중력이 무슨 역할을 하는지 탐구해보도록 유도합니다.
-        elif operation == "자율실험실": 
+        elif operation == "내 실험실": 
             시뮬레이션 위에 있는 입력창에 어떻게 시뮬레이션을 수정하고 싶은지 작성할 수 있도록 예시와 같은 방법으로 학생의 생각을 유도합니다.
             예시:
                 "원운동이 계속되려면 힘이 어떤 방향이어야 할 것 같나요?" 
@@ -151,7 +151,7 @@ def generate_chain(model_name="gpt-4o-mini"):
 # 사이드바 생성
 with st.sidebar:
 
-    options = ["자바 실험실", "자율실험실"]
+    options = ["예비실험실", "내 실험실"]
     operation = st.pills("(어떤 시뮬레이션을 하고 있는지 선택해주세요)", options, selection_mode="single")
 
     if operation is None:
@@ -220,41 +220,41 @@ with st.sidebar:
         st.success("제출 완료!")
 
 
-# 자율실험실 초기 세션 상태 설정
+# 내 실험실 초기 세션 상태 설정
 if 'button_timestamp' not in st.session_state:
     st.session_state.button_timestamp = time.time()
 if 'last_input' not in st.session_state:
     st.session_state.last_input = ''
 
-operation = "자바 실험실"
+operation = "예비실험실"
 
 with st.container(border=True):
-    tab1, tab2 = st.tabs(["자바 실험실", "자율실험실"])
+    tab1, tab2 = st.tabs(["예비실험실", "내 실험실"])
 
     # Create columns with specific ratios
     col1, col2, col3 = st.columns([5, 2, 3])
     # Place the button in the last column
     with col1:
         if st.button(
-            label="이전단계로 넘어가기",
+            label="이전단계로",
             icon="⏪",
-            help="문제(P)로 넘어가기",
+            help="생각하기로 이동하기",
             type="primary"
         ):
-            st.switch_page("pages/02_문제(P).py")
+            st.switch_page("pages_group/02_생각하기.py")
 
     # Place the button in the last column
     with col3:
         if st.button(
-            label="다음단계로 넘어가기",
+            label="다음단계로",
             icon="⏩",
-            help="돌아보기(E)로 넘어가기",
+            help="돌아보기로 이동하기",
             type="primary"
         ):
-            st.switch_page("pages/04_돌아보기(E).py")
+            st.switch_page("pages_group/04_돌아보기.py")
 
     with tab1: 
-        operation= "자바 실험실"
+        operation= "예비실험실"
         # CSS 스타일 적용
         st.markdown("""
             <style>
@@ -290,7 +290,7 @@ with st.container(border=True):
             </div>
         """, unsafe_allow_html=True)
     with tab2: 
-        operation= "자율실험실"
+        operation= "내 실험실"
         
         # 챗봇 설정
         # chat = ChatAnthropic(model="claude-3-5-sonnet-20240620")

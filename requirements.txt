@@ -4,6 +4,7 @@ st-gsheets-connection
 streamlit-drawable-canvas
 langchain-core
 langchain-openai
+langchain-anthropic
 langchain-teddynote
 langchain-community
 langchain-text-splitters

@@ -5,7 +5,7 @@ import streamlit as st
 from typing import List
 import getpass
 from langchain_openai import ChatOpenAI
-# from langchain_anthropic import ChatAnthropic
+from langchain_anthropic import ChatAnthropic
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langchain_core.globals import set_verbose
@@ -16,6 +16,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
+# from langchain_ollama import ChatOllama
 
 import time
 import importlib
@@ -37,7 +38,7 @@ if "tutor_messages" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
     st.session_state["tutor_messages"] = []
 
-DEFAULT_OPERATION = "자바 실험실"
+DEFAULT_OPERATION = "예비실험실"
 
 def enalble_submit_button():
     st.session_state["submit_button_disabled"] = False
@@ -77,7 +78,7 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
     return store[session_id]
 
 
-st.title("물리 시뮬레이션 실험실 🧪")
+st.title("실험하기 🧪")
 st.info("- 시뮬레이션을 관찰하고 조작해보면서, 앞에서 제출한 답과 비교해보세요. \n - 시뮬레이션에 대해서 궁금한 사항은 사이드바의 🤖AI 튜터에게 질문해보세요. \n - 시뮬레이션을 조작하면서 알게 된 사실을 사이드바 하단 박스에 적어보세요.")
 
 main_tab1 = st.container(border=True)
@@ -87,7 +88,7 @@ main_tab1.image("images/problem_1.png")
 # 모델 선택 메뉴
 selected_model = "gpt-4o-mini"
 
-default_operation = "자바 실험실"
+default_operation = "예비실험실"
 
 # 사이드바 시스템 체인 생성
 def generate_chain(model_name="gpt-4o-mini"):
@@ -105,15 +106,15 @@ def generate_chain(model_name="gpt-4o-mini"):
 
     **설명 전략:**
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 안내하세요.
-        if operation == "자바 실험실": 힘과 운동 방향의 각도를 조정하면서 원운동의 조건을 탐구해보도록 안내합니다.
+        if operation == "예비실험실": 힘과 운동 방향의 각도를 조정하면서 원운동의 조건을 탐구해보도록 안내합니다.
         elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 어떨 때 행성이 원운동이 일어날 수 있을지 조작해보도록 안내합니다.
-        elif operation == "자율실험실": 시뮬레이션 위에 있는 입력창에 내가 생각하는 힘의 방향이나 그 외 다양한 변수를 수정해보도록 안내합니다.
+        elif operation == "내 실험실": 시뮬레이션 위에 있는 입력창에 내가 생각하는 힘의 방향이나 그 외 다양한 변수를 수정해보도록 안내합니다.
 
     **핵심 개념 질문 전략:**  
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 질문하여 학생의 생각을 유도하세요.
-        if operation == "자바 실험실": 힘의 방향과 물체의 운동 궤도 사이의 관계를 탐구해보도록 유도합니다.
+        if operation == "예비실험실": 힘의 방향과 물체의 운동 궤도 사이의 관계를 탐구해보도록 유도합니다.
         elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 중력이 무슨 역할을 하는지 탐구해보도록 유도합니다.
-        elif operation == "자율실험실": 
+        elif operation == "내 실험실": 
             시뮬레이션 위에 있는 입력창에 어떻게 시뮬레이션을 수정하고 싶은지 작성할 수 있도록 예시와 같은 방법으로 학생의 생각을 유도합니다.
             예시:
                 "원운동이 계속되려면 힘이 어떤 방향이어야 할 것 같나요?" 
@@ -131,6 +132,12 @@ def generate_chain(model_name="gpt-4o-mini"):
         model_name=model_name,
         openai_api_key = st.session_state.api_key
     )
+
+    # llm_acer_server = ChatOllama(
+    #     # model="exaone3.5:7.8b-instruct-q8_0", temperature=0
+    #     model="codellama:7b-instruct-q6_K", temperature=0
+    # )
+
     chain = prompt | llm
     chain_with_history = RunnableWithMessageHistory(
         chain,
@@ -144,7 +151,7 @@ def generate_chain(model_name="gpt-4o-mini"):
 # 사이드바 생성
 with st.sidebar:
 
-    options = ["자바 실험실", "자율실험실"]
+    options = ["예비실험실", "내 실험실"]
     operation = st.pills("(어떤 시뮬레이션을 하고 있는지 선택해주세요)", options, selection_mode="single")
 
     if operation is None:
@@ -213,41 +220,41 @@ with st.sidebar:
         st.success("제출 완료!")
 
 
-# 자율실험실 초기 세션 상태 설정
+# 내 실험실 초기 세션 상태 설정
 if 'button_timestamp' not in st.session_state:
     st.session_state.button_timestamp = time.time()
 if 'last_input' not in st.session_state:
     st.session_state.last_input = ''
 
-operation = "자바 실험실"
+operation = "예비실험실"
 
 with st.container(border=True):
-    tab1, tab2 = st.tabs(["자바 실험실", "자율실험실"])
+    tab1, tab2 = st.tabs(["예비실험실", "내 실험실"])
 
     # Create columns with specific ratios
-    col1, col2, col3 = st.columns([5, 2, 3])
+    col1, col2, col3 = st.columns([5, 2, 2])
     # Place the button in the last column
     with col1:
         if st.button(
-            label="이전단계로 넘어가기",
+            label="이전단계로",
             icon="⏪",
-            help="문제(P)로 넘어가기",
+            help="생각하기로 이동하기",
             type="primary"
         ):
-            st.switch_page("pages/02_문제(P).py")
+            st.switch_page("pages_group/02_생각하기.py")
 
     # Place the button in the last column
     with col3:
         if st.button(
-            label="다음단계로 넘어가기",
+            label="다음단계로",
             icon="⏩",
-            help="돌아보기(E)로 넘어가기",
+            help="돌아보기로 이동하기",
             type="primary"
         ):
-            st.switch_page("pages/04_돌아보기(E).py")
+            st.switch_page("pages_group/04_돌아보기.py")
 
     with tab1: 
-        operation= "자바 실험실"
+        operation= "예비실험실"
         # CSS 스타일 적용
         st.markdown("""
             <style>
@@ -283,12 +290,17 @@ with st.container(border=True):
             </div>
         """, unsafe_allow_html=True)
     with tab2: 
-        operation= "자율실험실"
+        operation= "내 실험실"
         
         # 챗봇 설정
-        #chat = ChatAnthropic(model="claude-3-5-sonnet-20240620")
-        chat = ChatOpenAI(model="gpt-4o-mini", api_key=st.session_state.api_key)
-
+        # chat = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+        
+        chat = ChatOpenAI(model="gpt-4o-mini", api_key=st.session_state.api_key, temperature=0)
+        # chat = ChatOllama(
+        # #   model="exaone3.5:7.8b-instruct-q8_0", temperature=0
+        #     model="codellama:7b-instruct-q6_K", temperature=0
+        # )
+    
         # 시뮬레이션 수정중에는 화면 보이지 않게 스위치
         fixingNow = False
         afterFixing = False
@@ -308,7 +320,7 @@ with st.container(border=True):
             st.info("🔄 수정된 시뮬레이션이 실행 중입니다")
             
             # 사용자 입력 받기
-            user_input = st.chat_input("🤖 시뮬레이션을 어떻게 더 수정하고 싶은지 설명해주세요")
+            user_input = st.chat_input("🤖 시뮬레이션을 어떻게 더 수정하고 싶은지 AI에게 설명해주세요")
             
             # 원본으로 돌아가기 버튼
             if st.button("원본 시뮬레이션으로 돌아가기"):
@@ -325,30 +337,24 @@ with st.container(border=True):
                 fixingNow = True
                 st.session_state.last_input = user_input
                 
-                with st.spinner("요청에 따라 시뮬레이션을 수정하고 있습니다..."):
+                with st.spinner("AI가 요청에 따라 시뮬레이션을 수정하고 있습니다..."):
                     # AI 응답 받기
-                    full_prompt = f"""
-                    현재 시뮬레이션 코드를 분석하고, 사용자의 요청에 따라 수정해주세요.
-                    코드는 Python과 Streamlit을 사용하는 물리 시뮬레이션입니다.
-
-                    현재 코드:
-                    {st.session_state.current_code}
-
-                    사용자가 현재 코드에 대해 매우 불만족할 경우에는 기존 코드를 참고하여 수정해주세요.
-
-                    기존 코드:
-                    {st.session_state.original_code}
-
+                    full_prompt = f"""You are an expert programmer that writes simple, concise code and explanations.
+                    현재 코드: {st.session_state.current_code}
                     사용자 요청: "{user_input}"
 
-                    다음 사항들을 고려하여 수정해주세요:
-                    1. 시뮬레이션의 물리적 특성 (속도, 힘, 궤도 등)
-                    2. 시각적 요소 (색상, 크기, 벡터 표시 등)
+                    **목표:** 현재 시뮬레이션 코드를 분석하고, 만약 사용자의 요청이 비합리적이더라도 임의로 판단하지 말고 사용자의 요청대로 코드를 수정해주세요.
 
-                    응답 형식:
+                    **중요:** 
+                    1. 시뮬레이션 코드가 가진 고유한 prompt 요청 사항을 고려하여 수정해주세요.
+                    2. 시뮬레이션 코드는 Python과 Streamlit을 사용하는 물리 시뮬레이션입니다.
+                    3. 만약 사용자가 현재 코드에 대해 매우 불만족할 경우에는 기존 코드를 참고하여 수정해주세요.
+                        - 기존 코드: {st.session_state.original_code}
+
+                    **응답 형식:**
                     1. 수정이 필요한 함수나 클래스의 전체 코드를 ```python ``` 블록 안에 작성하세요
                     2. 여러 함수를 수정할 경우 각각 별도의 코드 블록으로 작성하세요
-                    3. 수정된 부분에 대한 설명을 추가해주세요
+                    3. 수정된 부분에 대해 최대 2문장으로 "modified_explanation: 수정된 부분에 대한 설명. 함수나 코드를 언급하는 대신 함수나 코드가 의미하는 내용을 언급하여 설명." 형태로 설명을 추가하세요
                     """
                     response = chat.invoke([HumanMessage(content=full_prompt)])
                     
@@ -357,6 +363,13 @@ with st.container(border=True):
                         modified_section = response.content
                         code_pattern = r'```python\n(.*?)```'
                         code_matches = re.findall(code_pattern, modified_section, re.DOTALL)
+                        print(modified_section)
+
+                        # Extract explanation from the response
+                        explanation_match = re.search(r'modified_explanation:\s*(.*?)(?:\n|$)', modified_section, re.DOTALL)
+                        if explanation_match:
+                            explanation = explanation_match.group(1).strip()
+                            st.session_state.current_explanation = explanation
                         
                         if code_matches:
                             modified_code = st.session_state.current_code
@@ -373,8 +386,19 @@ with st.container(border=True):
                                 file.write(modified_code)
                             
                             st.session_state.current_code = modified_code
+                            
+                            # 시뮬레이션 모듈 재로딩
+                            if 'simulation_user' in sys.modules:
+                                del sys.modules['simulation_user']
+                            
+                            # 약간의 지연을 주어 파일이 완전히 저장되도록 함
+                            time.sleep(0.1)
+                            
+                            # 시뮬레이션 초기화
                             fixingNow = False
                             st.rerun()
+                            from simulation.simulation_user import reset_simulation
+                            reset_simulation()
                         else:
                             st.error("AI 응답에서 코드 블록을 찾을 수 없습니다.")
                             
@@ -393,6 +417,12 @@ with st.container(border=True):
                     from simulation.simulation_user import main
                     st.divider()
                     main()
+                    
+                    # Display explanation below simulation
+                    if "current_explanation" in st.session_state:
+                        st.markdown("### ")
+                        st.markdown(st.session_state.current_explanation)
+                    
                     fixingNow = False
                     # 시뮬레이션 실행 전 컨테이너 초기화
                     success = True  # 성공적으로 실행됨
@@ -405,21 +435,19 @@ with st.container(border=True):
                     
                     if attempt < max_attempts:  # 마지막 시도가 아닌 경우에만 수정 시도
                         with st.spinner(f"AI가 오류를 분석하고 코드를 수정하고 있습니다... (시도 {attempt}/{max_attempts})"):
-                            error_prompt = f"""
-                            이전에 수정한 시뮬레이션 코드에서 오류가 발생했습니다.
+                            error_prompt = f"""You are an expert programmer that writes simple, concise code and explanations.
                             오류 내용: {error_msg}
+                            현재 코드: {st.session_state.current_code}
+                            **목표:** 이전에 수정한 시뮬레이션 코드에서 오류가 발생했습니다. 오류 내용과 현재 코드를 참고하여 오류가 발생하지 않도록 시뮬레이션을 수정하세요.
 
-                            현재 코드:
-                            {st.session_state.current_code}
-
-                            다음 사항들을 고려하여 수정해주세요:
-                            1. 시뮬레이션의 물리적 특성 (속도, 힘, 위치 등)
-                            2. 시각적 요소 (색상, 크기, 벡터 표시 등)
-
-                            응답 형식:
+                            **중요:** 
+                            1. 시뮬레이션 코드가 가진 고유한 prompt 요청 사항을 고려하여 수정해주세요.
+                            2. 시뮬레이션 코드는 Python과 Streamlit을 사용하는 물리 시뮬레이션입니다.
+                            
+                            **응답 형식:**
                             1. 수정이 필요한 함수나 클래스의 전체 코드를 ```python ``` 블록 안에 작성하세요
                             2. 여러 함수를 수정할 경우 각각 별도의 코드 블록으로 작성하세요
-                            3. 수정된 부분에 대한 설명을 추가해주세요
+                            3. 어떤 것이 수정되었는지 최대 2문장으로 "modified_explanation: 수정된 부분에 대한 설명" 형태로 추가하세요
                             """
                             response = chat.invoke([HumanMessage(content=error_prompt)])
                             
@@ -428,6 +456,13 @@ with st.container(border=True):
                                 modified_section = response.content
                                 code_pattern = r'```python\n(.*?)```'
                                 code_matches = re.findall(code_pattern, modified_section, re.DOTALL)
+                                print(modified_section)
+
+                                # Extract explanation from the response
+                                explanation_match = re.search(r'modified_explanation:\s*(.*?)(?:\n|$)', modified_section, re.DOTALL)
+                                if explanation_match:
+                                    explanation = explanation_match.group(1).strip()
+                                    st.session_state.current_explanation = explanation
                                 
                                 if code_matches:
                                     modified_code = st.session_state.current_code
@@ -457,9 +492,9 @@ with st.container(border=True):
         
         # 기본 시뮬레이션 실행 중인 경우
         else:
-            st.success("✨ 기본 시뮬레이션이 실행 중입니다")
+            st.success("✨ 현재는 힘이 작용하고 있지 않습니다. 원운동이 되려면 어떻게 힘이 작용해야 할까요?")
 
-            user_input = st.chat_input("🤖아래 시뮬레이션을 어떻게 수정하고 싶은지 설명해주세요")
+            user_input = st.chat_input("🤖아래 시뮬레이션을 어떻게 수정하고 싶은지 AI에게 설명해주세요")
             
             # 사용자의 답변을 반영한 시뮬레이션 보기 버튼 추가
             if st.button("또는, '문제'에서 답한 내용을 시뮬레이션에 반영하기"):
@@ -487,23 +522,22 @@ with st.container(border=True):
                 fixingNow = True
                 with st.spinner("요청에 따라 시뮬레이션을 수정하고 있습니다..."):
                     # AI 응답 받기
-                    full_prompt = f"""
-                    현재 시뮬레이션 코드를 분석하고, 사용자의 요청에 따라 수정해주세요.
-                    코드는 Python과 Streamlit을 사용하는 물리 시뮬레이션입니다.
-
-                    현재 코드:
-                    {st.session_state.current_code}
-
+                    full_prompt = f"""You are an expert programmer that writes simple, concise code and explanations.
+                    현재 코드: {st.session_state.current_code}
                     사용자 요청: "{user_input}"
 
-                    다음 사항들을 고려하여 수정해주세요:
-                    1. 시뮬레이션의 물리적 특성 (속도, 힘, 궤도 등)
-                    2. 시각적 요소 (색상, 크기, 벡터 표시 등)
+                    **목표:** 현재 시뮬레이션 코드를 분석하고, 만약 사용자의 요청이 비합리적이더라도 임의로 판단하지 말고 사용자의 요청대로 코드를 수정해주세요.
 
-                    응답 형식:
+                    **중요:** 
+                    1. 시뮬레이션 코드가 가진 고유한 prompt 요청 사항을 고려하여 수정해주세요.
+                    2. 시뮬레이션 코드는 Python과 Streamlit을 사용하는 물리 시뮬레이션입니다.
+                    3. 만약 사용자가 현재 코드에 대해 매우 불만족할 경우에는 기존 코드를 참고하여 수정해주세요.
+                        - 기존 코드: {st.session_state.original_code}
+
+                    **응답 형식:**
                     1. 수정이 필요한 함수나 클래스의 전체 코드를 ```python ``` 블록 안에 작성하세요
                     2. 여러 함수를 수정할 경우 각각 별도의 코드 블록으로 작성하세요
-                    3. 수정된 부분에 대한 설명을 추가해주세요
+                    3. 수정된 부분에 대해 최대 2문장으로 "modified_explanation: 수정된 부분에 대한 설명" 형태로 설명을 추가하세요
                     """
                     response = chat.invoke([HumanMessage(content=full_prompt)])
                     
@@ -512,6 +546,13 @@ with st.container(border=True):
                         modified_section = response.content
                         code_pattern = r'```python\n(.*?)```'
                         code_matches = re.findall(code_pattern, modified_section, re.DOTALL)
+                        print(modified_section)
+                        
+                        # Extract explanation from the response
+                        explanation_match = re.search(r'modified_explanation:\s*(.*?)(?:\n|$)', modified_section, re.DOTALL)
+                        if explanation_match:
+                            explanation = explanation_match.group(1).strip()
+                            st.session_state.current_explanation = explanation
                         
                         if code_matches:
                             modified_code = st.session_state.current_code
@@ -528,8 +569,19 @@ with st.container(border=True):
                                 file.write(modified_code)
                             
                             st.session_state.current_code = modified_code
+                            
+                            # 시뮬레이션 모듈 재로딩
+                            if 'simulation_user' in sys.modules:
+                                del sys.modules['simulation_user']
+                            
+                            # 약간의 지연을 주어 파일이 완전히 저장되도록 함
+                            time.sleep(0.1)
+                            
+                            # 시뮬레이션 초기화
                             fixingNow = False
                             st.rerun()
+                            from simulation.simulation_user import reset_simulation
+                            reset_simulation()
                         else:
                             st.error("AI 응답에서 코드 블록을 찾을 수 없습니다.")
                             

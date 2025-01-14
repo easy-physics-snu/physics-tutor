@@ -1,4 +1,11 @@
-# 시뮬레이션 코드
+"""
+# 운동 시뮬레이션 코드
+# 이 시뮬레이션은 물체의 운동을 시각적으로 보여줍니다.
+# 초기 기본 상수 및 calculate_force 함수만 수정할 수 있습니다.
+# simulation plot 함수는 error 발생으로 인해 수정이 불가피한 경우에만 수정할 수 있습니다.
+# 그 외 다른 함수는 수정해서는 안 됩니다.
+"""
+
 import os
 import streamlit as st
 import plotly.graph_objects as go
@@ -7,44 +14,63 @@ import math
 from datetime import datetime
 import time
 
-# 파일 상단에 추가
+# 시뮬레이션 초기 기본 상수 설정
+# WINDOW_WIDTH, HEIGHT: 시뮬레이션 창의 크기
+# ORBIT_RADIUS: 원운동의 반지름
+# BALL_MASS: 물체의 질량
+# INITIAL_SPEED: 초기 속도
+# VECTOR_SCALE: 벡터 표시 크기 조절 상수
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 ORBIT_RADIUS = 100
 BALL_MASS = 1
 BALL_RADIUS = 10
 INITIAL_SPEED = 200
-VECTOR_SCALE = 0.15
+VECTOR_SCALE = 0.2
 FPS = 60
 center_x = WINDOW_WIDTH // 2
 center_y = WINDOW_HEIGHT // 2
 
+def calculate_force(position, velocity):
+    """
+    물체에 작용하는 힘을 계산하는 이 함수는 유저의 요청에 따라 달라지게 되며, 
+    요청시 물체의 현재 위치와 속도를 사용하여 함수를 구성할 수도 있습니다.
+    """
+    # 여기에 실제 힘을 계산하는 코드를 추가할 수 있습니다.
+    # 현재는 힘이 0인 상태입니다. 
+    # 만약 유저의 요청에 힘의 크기가 명시되지 않은 경우 크기가 100인 힘을 만드세요.
+    return np.array([0, 0])
+
 def init_simulation_state():
+    """
+    시뮬레이션의 초기 상태를 설정하는 함수
+    - position: 물체의 초기 위치 (원의 가장 오른쪽 지점)
+    - velocity: 초기 속도 (위쪽 방향)
+    - trajectory_points: 물체의 궤적을 저장하는 리스트
+    - show_velocity_vector: 속도 벡터 표시 여부
+    - show_force_vector: 힘 벡터 표시 여부
+    """
     if 'simulation_state' not in st.session_state:
-        
         st.session_state.simulation_state = {
             'position': [center_x + ORBIT_RADIUS, center_y],
             'velocity': [0, INITIAL_SPEED],
             'trajectory_points': [],
             'simulation_running': False,
             'show_velocity_vector': True,
-            'show_force_vector': False,
+            'show_force_vector': True,
         }
 
-# 힘 계산 함수.
-def calculate_force(position, velocity):
-    center = np.array([WINDOW_WIDTH/2, WINDOW_HEIGHT/2])
-    pos = np.array(position)
-    r = pos - center
-    distance = np.linalg.norm(r)
-    centripetal_force_magnitude = -BALL_MASS * INITIAL_SPEED**2 / distance
-    centripetal_force_vector = centripetal_force_magnitude * r / distance # 구심력 크기에 방향 벡터 곱해준거임
-    resultant_force = centripetal_force_vector
-    
-    return resultant_force
-
-# 위치 업데이트 함수.
+# 이 함수는 수정되지 않아야 함.
 def update_position(dt):
+    """
+    물체의 위치를 업데이트하는 함수이며, 이 함수는 물리학 기본 법칙이므로 수정하면 안 됨.
+    
+    1. 현재 위치에서의 구심력 계산
+    2. 가속도 계산 (F = ma)
+    3. 속도 업데이트 (v = v₀ + at)
+    4. 위치 업데이트 (x = x₀ + vt)
+    5. 궤적 점 저장 (최대 500개 제한)
+    """
     state = st.session_state.simulation_state
     force = calculate_force(state['position'], state['velocity'])
     acceleration = force / BALL_MASS
@@ -59,8 +85,18 @@ def update_position(dt):
     if len(state['trajectory_points']) > MAX_TRAJECTORY_POINTS:
         state['trajectory_points'].pop(0)  # 가장 오래된 점 제거
 
-# 벡터 표시 함수.
+# 이 함수는 수정되지 않아야 함.
 def create_arrow(start, end, color):
+    """
+    벡터를 화살표로 표시하는 함수이며, 이 부분은 수정되지 않아야 함.
+    
+    1. 화살표의 방향 벡터 계산
+    2. 화살표 머리 부분 생성 (30도 각도)
+    3. 시작점, 끝점, 화살표 머리를 연결하는 선분 생성
+    
+    Returns:
+        화살표 모양의 Plotly Scatter 객체
+    """
     # 리스트를 NumPy 배열로 변환
     start = np.array(start)
     end = np.array(end)
@@ -88,8 +124,17 @@ def create_arrow(start, end, color):
     return go.Scatter(x=arrow_x, y=arrow_y, mode='lines',
                      line=dict(color=color, width=2), showlegend=False)
 
-# 시뮬레이션 플롯 생성 함수.    
 def create_simulation_plot():
+    """
+    시뮬레이션 화면을 생성하는 함수
+    
+    표시 요소:
+    1. 원형 궤도
+    2. 중심점
+    3. 운동하는 물체
+    4. 물체의 궤적
+    5. 벡터 (옵션)
+    """
     state = st.session_state.simulation_state
     center = [WINDOW_WIDTH/2, WINDOW_HEIGHT/2]
     
@@ -105,13 +150,21 @@ def create_simulation_plot():
         ),
         # 중심점
         go.Scatter(
-            x=[center[0]], y=[center[1]],
-            mode='markers', marker=dict(color='red', size=10)
+            x=[center[0]],
+            y=[center[1]],
+            mode='markers',
+            marker=dict(color='red', size=8),
+            hovertemplate=f'원의 반지름: {int(round(ORBIT_RADIUS))}<extra></extra>',
+            showlegend=False
         ),
         # 공
         go.Scatter(
-            x=[state['position'][0]], y=[state['position'][1]],
-            mode='markers', marker=dict(color='blue', size=15)
+            x=[state['position'][0]],
+            y=[state['position'][1]],
+            mode='markers',
+            marker=dict(color='blue', size=15),
+            hovertemplate=f'질량: {int(round(BALL_MASS))}<extra></extra>',
+            showlegend=False
         )
     ])
     
@@ -124,18 +177,40 @@ def create_simulation_plot():
         ))
     
     # 벡터 표시 (속도, 힘)
-    for show_vector, vector_type, color in [
-        (state['show_velocity_vector'], state['velocity'], 'blue'),
-        (state['show_force_vector'], calculate_force(state['position'], state['velocity']), 'green')
-    ]:
+    vectors_info = [
+        (state['show_velocity_vector'], state['velocity'], 'blue', '속도'),
+        (state['show_force_vector'], calculate_force(state['position'], state['velocity']), 'green', '힘')
+    ]
+    
+    for show_vector, vector_type, color, vector_name in vectors_info:
         if show_vector:
+            # 벡터의 크기 계산
+            vector_magnitude = np.linalg.norm(vector_type)
+            
+            # 벡터 화살표 끝점 계산
             vector_end = [
                 state['position'][0] + vector_type[0] * VECTOR_SCALE,
                 state['position'][1] + vector_type[1] * VECTOR_SCALE
             ]
+            
+            # 벡터 화살표 추가
             arrow = create_arrow(state['position'], vector_end, color)
             if arrow:
                 fig.add_trace(arrow)
+            
+            # 벡터 크기 텍스트 위치 계산 (물체 아래)
+            text_x = state['position'][0]
+            text_y = state['position'][1] - (40 if vector_name == "속도" else 60)  # 속도는 40픽셀, 힘은 60픽셀 아래
+            
+            # 벡터 크기 텍스트 추가
+            fig.add_trace(go.Scatter(
+                x=[text_x],
+                y=[text_y],
+                mode='text',
+                text=[f'{vector_name} 크기: {int(round(vector_magnitude))}'],
+                textfont=dict(color=color, size=12),
+                showlegend=False
+            ))
     
     # 레이아웃 설정
     fig.update_layout(
@@ -147,7 +222,43 @@ def create_simulation_plot():
         plot_bgcolor='white'
     )
     
+    # 힌트 텍스트 추가
+    hint_text = "물체의 속도는 알짜힘이 작용하지 않으면 변하지 않는다.(뉴턴의 제1운동법칙)<br>물체의 속도는 알짜힘이 작용하는 방향으로 변한다.(뉴턴의 제2운동법칙)"
+    
+    fig.add_annotation(
+        x=WINDOW_WIDTH-10,  # 오른쪽 끝에서 10픽셀 안쪽
+        y=10,  # 아래쪽에서 10픽셀 위
+        text="💡힌트",
+        showarrow=False,
+        xanchor="right",
+        yanchor="bottom",
+        bgcolor="rgba(255, 255, 255, 0.8)",
+        bordercolor="rgba(0, 0, 0, 0.3)",
+        borderwidth=1,
+        borderpad=4,
+        hovertext=hint_text,
+        font=dict(size=12),
+        hoverlabel=dict(
+            bgcolor="white",
+            bordercolor="black",
+            font=dict(size=12)
+        )
+    )
+    
     return fig
+
+def reset_simulation():
+    """
+    시뮬레이션을 초기 상태로 재설정하는 함수
+    """
+    return {
+        'position': [center_x + ORBIT_RADIUS, center_y],
+        'velocity': [0, INITIAL_SPEED],
+        'trajectory_points': [],
+        'simulation_running': False,
+        'show_velocity_vector': True,
+        'show_force_vector': True,
+    }
 
 def main():
     init_simulation_state()
@@ -155,16 +266,9 @@ def main():
     # 컨트롤 버튼들을 딕셔너리로 관리
     controls = {
         "▶️ 시뮬레이션 시작/정지": lambda: {'simulation_running': not st.session_state.simulation_state['simulation_running']},
-        "🟢 힘 벡터 표시": lambda: {'show_force_vector': not st.session_state.simulation_state['show_force_vector']},
-        "🔵 속도 벡터 표시": lambda: {'show_velocity_vector': not st.session_state.simulation_state['show_velocity_vector']},
-        "🔄 다시 재생": lambda: {
-            'position': [center_x + ORBIT_RADIUS, center_y],
-            'velocity': [0, INITIAL_SPEED],
-            'trajectory_points': [],
-            'simulation_running': False,
-            'show_velocity_vector': True,
-            'show_force_vector': False,
-        },
+        "🟢 힘 표시": lambda: {'show_force_vector': not st.session_state.simulation_state['show_force_vector']},
+        "🔵 속도 표시": lambda: {'show_velocity_vector': not st.session_state.simulation_state['show_velocity_vector']},
+        "🔄 다시 재생": reset_simulation,
     }
     
     # 버튼 생성 및 상태 업데이트

@@ -17,12 +17,7 @@ import streamlit as st
 import pandas as pd
 
 
-# API KEY 정보로드
-#load_dotenv()
-
-# python -m streamlit run main.py
-st.title("📚얘들아 물리 쉬워✨")
-
+st.title("들어가기 🚀")
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
@@ -281,6 +276,7 @@ with tab1:
         st.image("images/explain_1.png")
         st.image("images/explain_2.png")
 
+
 # col1, col2 = st.columns(2)
 # cont = st.container(border=True)
 
@@ -521,15 +517,15 @@ with tab2:
 
 
 # Create columns with specific ratios
-col1, col2, col3 = st.columns([5, 2, 3])
+col1, col2, col3 = st.columns([5, 2, 2])
 
 # Place the button in the last column
 
 with col3:
     if st.button(
-        label="다음단계로 넘어가기",
+        label="다음단계로",
         icon="⏩",
-        help="문제(P)로 넘어가기",
+        help="생각하기로 이동하기",
         type="primary"
     ):
-        st.switch_page("pages/02_문제(P).py")
+        st.switch_page("pages_group/02_생각하기.py")

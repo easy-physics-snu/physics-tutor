@@ -517,7 +517,7 @@ with tab2:
 
 
 # Create columns with specific ratios
-col1, col2, col3 = st.columns([5, 2, 3])
+col1, col2, col3 = st.columns([5, 2, 2])
 
 # Place the button in the last column
 

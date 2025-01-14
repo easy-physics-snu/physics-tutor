@@ -232,7 +232,7 @@ with st.container(border=True):
     tab1, tab2 = st.tabs(["예비실험실", "내 실험실"])
 
     # Create columns with specific ratios
-    col1, col2, col3 = st.columns([5, 2, 3])
+    col1, col2, col3 = st.columns([5, 2, 2])
     # Place the button in the last column
     with col1:
         if st.button(

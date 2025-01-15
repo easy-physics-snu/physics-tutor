@@ -144,7 +144,7 @@ with tab1:
     if submit_button:
         st.session_state["explanation_user_drawing"] = canvas_result.image_data
         st.session_state["explanation_user_reason"] = reason
-        st.success("제출 완료!")
+        st.success("제출 완료! 상단의 '문제 정답' 탭에서 답을 확인해보세요:)")
 
 
 with tab2:
@@ -186,7 +186,7 @@ with tab2:
 with st.sidebar:
 
     st.text("AI튜터와 대화하기")
-    messages = st.container(height=300)
+    messages = st.container(height=400)
     ai_info = st.empty()
 
     with tab2:

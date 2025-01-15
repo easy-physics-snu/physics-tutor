@@ -81,9 +81,12 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
 st.title("실험하기 🧪")
 st.info("- 시뮬레이션을 관찰하고 조작해보면서, 앞에서 제출한 답과 비교해보세요. \n - 시뮬레이션에 대해서 궁금한 사항은 사이드바의 🤖AI 튜터에게 질문해보세요. \n - 시뮬레이션을 조작하면서 알게 된 사실을 사이드바 하단 박스에 적어보세요.")
 
-main_tab1 = st.container(border=True)
-main_tab1.text("문제 상황")
-main_tab1.image("images/problem_1.png")
+with st.expander(
+    label="문제 보기 🔍",
+    expanded=True
+    ):
+    main_tab1 = st.container(border=True)
+    main_tab1.image("images/problem_1.png")
 
 # 모델 선택 메뉴
 selected_model = "gpt-4o-mini"

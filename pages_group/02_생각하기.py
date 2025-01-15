@@ -245,7 +245,7 @@ with st.sidebar:
 
 
     st.text("AI튜터와 대화하기")
-    messages = st.container(height=300)
+    messages = st.container(height=400)
 
 
     # 이전 대화를 출력

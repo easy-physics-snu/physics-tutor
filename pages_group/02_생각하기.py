@@ -113,6 +113,10 @@ def save_draw_image(numpy_array):
     image.save(f"draw_images/{file_name}.png", format="PNG")
     # return st.info("이미지 저장됨")
 
+def save_draw_explanation(text):
+    st.session_state["2stage_explanation"] = text
+
+
 def enalble_submit_button():
     st.session_state["submit_button_disabled"] = False
 
@@ -170,7 +174,7 @@ if submit_button:
     st.session_state["predict_user_drawing"] = canvas_result.image_data
     st.session_state["predict_user_reason"] = reason
     st.success("제출 완료!")
-    st.info("정답은 돌아보기(E) 단계에서 확인할 수 있습니다! 다음 단계로 넘어가세요:)")
+    st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 다음 단계로 넘어가세요:)")
 
 # Create columns with specific ratios
 col1, col2, col3 = st.columns([5, 2, 2])

@@ -108,6 +108,27 @@ with tab1:
         main_tab1 = st.container(border=True)
         main_tab1.image(problem_image)
 
+
+    with st.popover(
+            label="내 이전 답안 보기 📄",
+        ):
+        # st.write(st.session_state)
+        # main_tab2 = st.text_area(disabled=True)
+
+        try:
+            drawing = st.session_state["predict_user_drawing"]
+            reason = st.session_state["predict_user_reason"]
+            
+            st.text("캔버스")
+            answer_canvas_tab1 = st.container(border=True)
+            st.text("예상의 이유")
+            answer_explanation_tab2 = st.container(border=True)
+            answer_canvas_tab1.image(drawing)
+            answer_explanation_tab2.write(reason)
+        except:
+            st.error("아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)")
+
+
     st.text("최종적으로 문제를 해결해보세요.")
     st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
     # Create a canvas component

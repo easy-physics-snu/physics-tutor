@@ -78,15 +78,49 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
     return store[session_id]
 
 
+def get_latest_image(folder_path):
+    # 폴더에서 파일 목록 가져오기
+    files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+    
+    # 이미지 파일 필터링 (jpg, png 등)
+    image_files = [f for f in files if f.lower().endswith(('.png'))]
+    
+    if not image_files:
+        print("이미지 파일이 없습니다.")
+        return None
+
+    # 파일 생성 시간 기준으로 가장 최신 파일 찾기
+    latest_file = max(image_files, key=os.path.getctime)
+    
+    return latest_file
+
+
 st.title("실험하기 🧪")
-st.info("- 시뮬레이션을 관찰하고 조작해보면서, 앞에서 제출한 답과 비교해보세요. \n - 시뮬레이션에 대해서 궁금한 사항은 사이드바의 🤖AI 튜터에게 질문해보세요. \n - 시뮬레이션을 조작하면서 알게 된 사실을 사이드바 하단 박스에 적어보세요.")
+st.info("- 시뮬레이션을 관찰하고 조작해보면서, 앞에서 제출한 답과 비교해보세요. \n - ⭐ **내 실험실에서는 '생각하기' 단계에서 제출한 답안대로 시뮬레이션 해 볼 수 있어요** ⭐ \n - 시뮬레이션에 대해서 궁금한 사항은 사이드바의 🤖AI 튜터에게 질문해보세요. \n - 시뮬레이션을 조작하면서 알게 된 사실을 사이드바 하단 박스에 적어보세요.")
 
 with st.expander(
-    label="문제 보기 🔍",
-    expanded=True
+        label="문제 보기 🔍",
+        expanded=True
     ):
     main_tab1 = st.container(border=True)
     main_tab1.image("images/problem_1.png")
+
+with st.popover(
+        label="내 이전 답안 보기 📄",
+    ):
+
+    try:
+        drawing = st.session_state["predict_user_drawing"]
+        reason = st.session_state["predict_user_reason"]
+        
+        st.text("캔버스")
+        answer_canvas_tab1 = st.container(border=True)
+        st.text("예상의 이유")
+        answer_explanation_tab2 = st.container(border=True)
+        answer_canvas_tab1.image(drawing)
+        answer_explanation_tab2.write(reason)
+    except:
+        st.error("아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)")
 
 # 모델 선택 메뉴
 selected_model = "gpt-4o-mini"

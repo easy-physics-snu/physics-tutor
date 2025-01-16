@@ -42,12 +42,15 @@ def parsing_messages(conv_history: List[ChatMessage]) -> str:
 
 
 
-def create_keyword(conv_history: List[ChatMessage]) -> List[str]:
+def create_keyword(conv_history: List[ChatMessage], keyword_section='02_thinking') -> List[str]:
     # chain 을 생성
     chain = create_chain(selected_prompt) #, task=task_input)
 
     if not conv_history:
-        message_context = "대화 기록이 아직 없습니다. 다음의 두 질문을 추천 질문으로 제시하세요. \n 1. 배운 개념이 이 문제에 어떻게 적용될 수 있는지 구체적인 예를 들어줄 수 있어? / 2. 등속 원운동이 어떤 건지 관련된 개념과 함께 설명해 줄 수 있어?"
+        if keyword_section == '02_thinking':
+            message_context = "대화 기록이 아직 없습니다. 다음의 두 질문을 추천 질문으로 제시하세요. \n 1. 배운 개념이 이 문제에 어떻게 적용될 수 있는지 구체적인 예를 들어줄 수 있어? / 2. 등속 원운동이 어떤 건지 관련된 개념과 함께 설명해 줄 수 있어?"
+        else:
+            message_context = "대화 기록이 아직 없습니다. 다음의 두 질문을 추천 질문으로 제시하세요. \n 1. 힘의 방향을 현재 궤도와 다르게 설정해 본다면, 물체의 운동 궤적이 어떻게 변할까요? / 2. 시뮬레이션에서 힘의 방향을 어떻게 설정해야 원운동이 유지될 수 있을까요? 입력창에 직접 작성해 보세요."
     else:
         message_context = parsing_messages(conv_history)
 

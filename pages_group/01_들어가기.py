@@ -145,7 +145,7 @@ st.session_state["pdf_chain"] = rag_chain
 with st.sidebar:
 
     st.text("AI튜터와 대화하기")
-    messages = st.container(height=300)
+    messages = st.container(height=400)
         
     def print_messages():
         for chat_message in st.session_state["intro_1_tutor_messages"]:

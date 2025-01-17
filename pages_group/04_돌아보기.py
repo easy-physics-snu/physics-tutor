@@ -1,7 +1,6 @@
 import streamlit as st
 import io
 import os
-import base64
 
 from PIL import Image
 from datetime import datetime
@@ -20,9 +19,6 @@ os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
 os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 st.session_state["init_user_input"] = False
-
-#TODO 문제 이미지가 있어야 AI튜터가 학습자 제출 답안에 대한 의미 있는 피드백을 제공 가능한지 확인
-PROBLEM_IMAGE_PATH = "images/problem_1.png"
 
 if "submit_button_disabled" not in st.session_state:
     st.session_state["submit_button_disabled"] = True
@@ -96,142 +92,11 @@ def init_multimodal_chain(system_prompt, user_prompt=None, model_name="gpt-4o"):
 
 
 st.title("돌아보기 🧐")
+st.info("- 하단의 캔버스에 최종적으로 생각한 **(1)답안**과 함께 그렇게 생각한 **(2)이유**를 적어주세요. \n - 정답을 적으면 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다. \n - AI 튜터와 대화하면서 내가 잘못 알고 있던 개념은 없는지 파악하고 내 이해도를 더 정교화해보세요.")
 
-# Create a container for the info message and tooltip
-info_container = st.container()
-left_col, right_col = info_container.columns([4, 1])
 
-with left_col:
-    message = """
-- 캔버스에 최종적으로 생각한 **(1)답안**과 그 **(2)이유**를 적어주세요.
-- 정답을 적으면 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다.
-- AI 튜터와 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
-"""
-    st.info(message)
-
-with right_col:
-    # Add custom CSS for tooltip and button
-    st.markdown("""
-            <style>
-            .button-container {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-            .tooltip-wrapper {
-                position: relative;
-                display: inline-block;
-                cursor: pointer;
-            }
-            .tooltip-wrapper .tooltip-content {
-                visibility: hidden;
-                width: 600px;
-                background-color: white;
-                color: black;
-                text-align: left;
-                border-radius: 8px;
-                padding: 16px;
-                position: absolute;
-                z-index: 1;
-                top: 0;
-                right: 100%;
-                margin-right: 16px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                opacity: 0;
-                transition: opacity 0.3s;
-            }
-            .tooltip-wrapper:hover .tooltip-content {
-                visibility: visible;
-                opacity: 1;
-            }
-            .tooltip-content img {
-                width: 100%;
-                height: auto;
-                border-radius: 4px;
-                margin-bottom: 8px;
-            }
-            .tooltip-content .answer-text {
-                font-size: 14px;
-                line-height: 1.4;
-                margin-top: 8px;
-                padding: 8px;
-                background-color: #f8f9fa;
-                border-radius: 4px;
-            }
-            .custom-button {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0.6rem 1.2rem;
-                background-color: rgb(255, 255, 255);
-                border: 1px solid rgba(49, 51, 63, 0.2);
-                border-radius: 0.5rem;
-                color: rgb(49, 51, 63);
-                font-size: 14px;
-                font-weight: 400;
-                line-height: 1.6;
-                text-decoration: none;
-                transition: border-color 200ms ease 0s, background-color 200ms ease 0s;
-                cursor: pointer;
-                width: 160px;
-                white-space: nowrap;
-            }
-            .custom-button:hover {
-                border-color: rgb(49, 51, 63);
-                color: rgb(49, 51, 63);
-                background-color: rgb(250, 250, 250);
-            }
-            .custom-button i {
-                margin-left: 0.3rem;
-                font-size: 1rem;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-    # Get user's previous answer and drawing from session state
-    user_drawing = st.session_state.get("predict_user_drawing", None)
-    user_reason = st.session_state.get("predict_user_reason", "이전 답안이 없습니다.")
-    
-    # Convert numpy array to base64 image if it exists
-    image_src = PROBLEM_IMAGE_PATH
-    if user_drawing is not None:
-        
-        # Convert numpy array to PIL Image
-        img = Image.fromarray(user_drawing.astype('uint8'))
-        
-        # Convert PIL Image to base64
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-        image_src = f"data:image/png;base64,{img_str}"
-    
-    # Create tooltip content with styled button
-    if user_drawing is not None and user_reason is not None:
-    
-        tooltip_html = f"""
-            <div class="button-container">
-            <div class="tooltip-wrapper">
-                <button class="custom-button">
-                        내가 제출한 답 보기
-                </button>
-                <div class="tooltip-content">
-                    <div class="drawing-explanation" style="font-size: 15px;">캔버스</div>
-                    <img src="{image_src}" alt="이전 답안 이미지">
-                    <div class="drawing-explanation" style="font-size: 15px;">예상의 이유</div>
-                    <div class="answer-text">{user_reason}</div>
-            </div>"""
-    else:
-        tooltip_html = f"""
-        <div class="button-container">
-        <div class="tooltip-wrapper">
-            <button class="custom-button">
-                    내가 제출한 답 보기
-            </button>
-            <div class="tooltip-content">
-                <div class="answer-text">아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)</div>
-            </div>"""
-    st.markdown(tooltip_html, unsafe_allow_html=True)
-
+#TODO 문제 이미지가 있어야 AI튜터가 학습자 제출 답안에 대한 의미 있는 피드백을 제공 가능한지 확인
+# PROBLEM_IMAGE = "images/problem_1.png"
 
 tab1, tab2 = st.tabs(['문제 상황', '문제 정답'])
 
@@ -255,6 +120,26 @@ with tab1:
                 caption="그림 작성 예시",
                 width=200
             )
+
+
+    with st.popover(
+            label="내 이전 답안 보기 📄",
+        ):
+        # st.write(st.session_state)
+        # main_tab2 = st.text_area(disabled=True)
+
+        try:
+            drawing = st.session_state["predict_user_drawing"]
+            reason = st.session_state["predict_user_reason"]
+            
+            st.text("캔버스")
+            answer_canvas_tab1 = st.container(border=True)
+            st.text("예상의 이유")
+            answer_explanation_tab2 = st.container(border=True)
+            answer_canvas_tab1.image(drawing)
+            answer_explanation_tab2.write(reason)
+        except:
+            st.error("아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)")
 
 
     st.text("최종적으로 문제를 해결해보세요.")

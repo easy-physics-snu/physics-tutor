@@ -36,14 +36,13 @@ def calculate_force(position, velocity):
     물체에 작용하는 힘을 계산하는 이 함수는 유저의 요청에 따라 달라지게 되며, 
     요청시 물체의 현재 위치와 속도를 사용하여 함수를 구성할 수도 있습니다.
     """
-    # 힘의 크기를 200으로 설정하고, 속도와 90도 각도를 이루도록 힘의 방향을 계산합니다.
-    force_magnitude = 200  # 힘의 크기를 200으로 변경
+    # 힘의 크기를 100으로 설정하고, 속도의 방향과 90도 각도로 작용하도록 힘을 계산합니다.
+    force_magnitude = 100
     force_direction = np.array([-velocity[1], velocity[0]])  # 90도 회전
     force_direction = force_direction / np.linalg.norm(force_direction)  # 단위 벡터로 변환
     return force_magnitude * force_direction
 
 def init_simulation_state():
-    reset_simulation()
     """
     시뮬레이션의 초기 상태를 설정하는 함수
     - position: 물체의 초기 위치 (원의 가장 오른쪽 지점)
@@ -148,7 +147,7 @@ def create_simulation_plot():
         go.Scatter(
             x=center[0] + ORBIT_RADIUS*np.cos(np.linspace(0, 2*np.pi, 100)),
             y=center[1] + ORBIT_RADIUS*np.sin(np.linspace(0, 2*np.pi, 100)),
-            mode='lines', line=dict(color='black', width=1, dash='dash')
+            mode='lines', line=dict(color='black', width=1)
         ),
         # 중심점
         go.Scatter(
@@ -156,7 +155,7 @@ def create_simulation_plot():
             y=[center[1]],
             mode='markers',
             marker=dict(color='red', size=8),
-            hovertemplate=f'[원 중심]<br>원의 반지름: {int(round(ORBIT_RADIUS))}<extra></extra>',
+            hovertemplate=f'원의 반지름: {int(round(ORBIT_RADIUS))}<extra></extra>',
             showlegend=False
         ),
         # 공
@@ -267,7 +266,7 @@ def main():
     
     # 컨트롤 버튼들을 딕셔너리로 관리
     controls = {
-        "▶️ 시작/정지": lambda: {'simulation_running': not st.session_state.simulation_state['simulation_running']},
+        "▶️ 시뮬레이션 시작/정지": lambda: {'simulation_running': not st.session_state.simulation_state['simulation_running']},
         "🟢 힘 표시": lambda: {'show_force_vector': not st.session_state.simulation_state['show_force_vector']},
         "🔵 속도 표시": lambda: {'show_velocity_vector': not st.session_state.simulation_state['show_velocity_vector']},
         "🔄 다시 재생": reset_simulation,
@@ -279,50 +278,6 @@ def main():
         unique_key = f"sim_button_{label}_{st.session_state.get('button_timestamp', 0)}"
         if cols[i].button(label, key=unique_key, type="secondary", use_container_width=True):
             st.session_state.simulation_state.update(update_func())
-
-    # 시뮬레이션이 한 번도 실행된 적이 없을 때만 안내 문구 표시
-    if not st.session_state.simulation_state['simulation_running']:
-        st.markdown("""
-            <style>
-            .floating-message {
-                position: relative;
-                display: inline-block;
-                margin-left: 0%;
-                margin-top: -15px;
-                z-index: 10000;
-                background-color: #FFE3E3;
-                padding: 8px 12px;
-                border-radius: 8px;
-                box-shadow: 0 4px 0 #FF9999,
-                           0 2px 8px rgba(0, 0, 0, 0.1);
-                font-size: 12px;
-                color: #FF5555;
-                font-weight: bold;
-                text-align: center;
-                border: 2px solid #FF9999;
-                pointer-events: none;
-                animation: gameFloat 2s ease-in-out infinite;
-                width: fit-content;
-                white-space: nowrap;
-            }
-            .floating-message::before {
-                content: '';
-                position: absolute;
-                top: -10px;
-                left: 50%;
-                transform: translateX(-50%);
-                border-left: 8px solid transparent;
-                border-right: 8px solid transparent;
-                border-bottom: 8px solid #FF9999;
-            }
-            @keyframes gameFloat {
-                0% { transform: translateY(0); }
-                50% { transform: translateY(-6px); }
-                100% { transform: translateY(0); }
-            }
-            </style>
-            <div class="floating-message">[시작/정지] 버튼을 눌러<br>실험을 시작해보세요!</div>
-        """, unsafe_allow_html=True)
     
     # 플롯 placeholder 생성
     plot_container = st.empty()
@@ -331,13 +286,13 @@ def main():
     while st.session_state.simulation_state['simulation_running']:
         update_position(1/FPS)
         fig = create_simulation_plot()
-        plot_container.plotly_chart(fig, use_container_width=True)
+        plot_container.plotly_chart(fig, use_container_width=False)
         time.sleep(1/FPS)  # FPS에 맞춰 대기
     
     # 시뮬레이션이 멈춰있을 때도 현재 상태 표시
     if not st.session_state.simulation_state['simulation_running']:
         fig = create_simulation_plot()
-        plot_container.plotly_chart(fig, use_container_width=True)
+        plot_container.plotly_chart(fig, use_container_width=False)
 
 if __name__ == "__main__":
     main()

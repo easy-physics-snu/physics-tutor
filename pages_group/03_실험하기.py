@@ -1,13 +1,14 @@
 import re
 import os
+import time
 import sys
+import base64
 import streamlit as st
 from typing import List
-import getpass
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+from PIL import Image
 
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, BaseMessage
 from langchain_core.globals import set_verbose
 from langchain_core.messages.chat import ChatMessage
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -17,21 +18,19 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 # from langchain_ollama import ChatOllama
+# from langchain_anthropic import ChatAnthropic
 
-from modules.keywords import create_keyword
 
-import time
-import importlib
 import simulation.simulation as simulation
 
 set_verbose(False)
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
-os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
-os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
-os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
-os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
+# os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
+# os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
+# os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
+# os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 if "submit_button_disabled" not in st.session_state:
     st.session_state["submit_button_disabled"] = True
@@ -41,6 +40,8 @@ if "tutor_messages" not in st.session_state:
     st.session_state["tutor_messages"] = []
 
 DEFAULT_OPERATION = "예비실험실"
+
+PROBLEM_IMAGE_PATH = "images/problem_1.png"
 
 def enalble_submit_button():
     st.session_state["submit_button_disabled"] = False
@@ -80,29 +81,149 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
     return store[session_id]
 
 
-def get_latest_image(folder_path):
-    # 폴더에서 파일 목록 가져오기
-    files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
-    
-    # 이미지 파일 필터링 (jpg, png 등)
-    image_files = [f for f in files if f.lower().endswith(('.png'))]
-    
-    if not image_files:
-        print("이미지 파일이 없습니다.")
-        return None
-
-    # 파일 생성 시간 기준으로 가장 최신 파일 찾기
-    latest_file = max(image_files, key=os.path.getctime)
-    
-    return latest_file
-
-
 st.title("실험하기 🧪")
-st.info("- 시뮬레이션을 관찰하고 조작해보면서, 앞에서 제출한 답과 비교해보세요. \n - ⭐ **내 실험실에서는 '생각하기' 단계에서 제출한 답안대로 시뮬레이션 해 볼 수 있어요** ⭐ \n - 시뮬레이션에 대해서 궁금한 사항은 사이드바의 🤖AI 튜터에게 질문해보세요. \n - 시뮬레이션을 조작하면서 알게 된 사실을 사이드바 하단 박스에 적어보세요.")
+
+# Create a container for the info message and tooltip
+info_container = st.container()
+left_col, right_col = info_container.columns([4, 1])
+
+with left_col:
+    message = """
+- 앞에서 제출한 답을 떠올리며 시뮬레이션을 관찰하고 조작해보세요.
+- 시뮬레이션에 대해서 궁금한건 사이드바 🤖AI 튜터에게 질문해보세요.
+- ⭐ **[내 실험실]에서는 내가 제출한 답을 시뮬레이션 해 볼 수 있어요** ⭐
+"""
+    st.info(message)
+
+with right_col:
+    # Add custom CSS for tooltip and button
+    st.markdown("""
+            <style>
+            .button-container {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .tooltip-wrapper {
+                position: relative;
+                display: inline-block;
+                cursor: pointer;
+            }
+            .tooltip-wrapper .tooltip-content {
+                visibility: hidden;
+                width: 600px;
+                background-color: white;
+                color: black;
+                text-align: left;
+                border-radius: 8px;
+                padding: 16px;
+                position: absolute;
+                z-index: 1;
+                top: 0;
+                right: 100%;
+                margin-right: 16px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            .tooltip-wrapper:hover .tooltip-content {
+                visibility: visible;
+                opacity: 1;
+            }
+            .tooltip-content img {
+                width: 100%;
+                height: auto;
+                border-radius: 4px;
+                margin-bottom: 8px;
+            }
+            .tooltip-content .answer-text {
+                font-size: 14px;
+                line-height: 1.4;
+                margin-top: 8px;
+                padding: 8px;
+                background-color: #f8f9fa;
+                border-radius: 4px;
+            }
+            .custom-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0.6rem 1.2rem;
+                background-color: rgb(255, 255, 255);
+                border: 1px solid rgba(49, 51, 63, 0.2);
+                border-radius: 0.5rem;
+                color: rgb(49, 51, 63);
+                font-size: 14px;
+                font-weight: 400;
+                line-height: 1.6;
+                text-decoration: none;
+                transition: border-color 200ms ease 0s, background-color 200ms ease 0s;
+                cursor: pointer;
+                width: 160px;
+                white-space: nowrap;
+            }
+            .custom-button:hover {
+                border-color: rgb(49, 51, 63);
+                color: rgb(49, 51, 63);
+                background-color: rgb(250, 250, 250);
+            }
+            .custom-button i {
+                margin-left: 0.3rem;
+                font-size: 1rem;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+    # Get user's previous answer and drawing from session state
+    user_drawing = st.session_state.get("predict_user_drawing", None)
+    user_reason = st.session_state.get("predict_user_reason", "이전 답안이 없습니다.")
+    
+    # Convert numpy array to base64 image if it exists
+    image_src = PROBLEM_IMAGE_PATH
+    if user_drawing is not None:
+        import base64
+        from PIL import Image
+        import io
+        
+        # Convert numpy array to PIL Image
+        img = Image.fromarray(user_drawing.astype('uint8'))
+        
+        # Convert PIL Image to base64
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        image_src = f"data:image/png;base64,{img_str}"
+    
+    # Create tooltip content with styled button
+    if user_drawing is not None and user_reason is not None:
+    
+        tooltip_html = f"""
+            <div class="button-container">
+            <div class="tooltip-wrapper">
+                <button class="custom-button">
+                        내가 제출한 답 보기
+                </button>
+                <div class="tooltip-content">
+                    <div class="drawing-explanation" style="font-size: 15px;">캔버스</div>
+                    <img src="{image_src}" alt="이전 답안 이미지">
+                    <div class="drawing-explanation" style="font-size: 15px;">예상의 이유</div>
+                    <div class="answer-text">{user_reason}</div>
+            </div>"""
+    else:
+        tooltip_html = f"""
+        <div class="button-container">
+        <div class="tooltip-wrapper">
+            <button class="custom-button">
+                    내가 제출한 답 보기
+            </button>
+            <div class="tooltip-content">
+                <div class="answer-text">아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)</div>
+            </div>"""
+    st.markdown(tooltip_html, unsafe_allow_html=True)
 
 with st.expander(
-        label="문제 보기 🔍",
-        expanded=True
+    label="문제 보기 🔍",
+    expanded=True
     ):
     main_tab1 = st.container(border=True)
     main_tab1.write("""무중력 상태의 우주 공간에 새로운 행성을 찾아 다니는 인공 위성이 있습니다. \n
@@ -119,23 +240,6 @@ with st.expander(
             caption="그림 작성 예시",
             width=200
         )
-
-with st.popover(
-        label="내 이전 답안 보기 📄",
-    ):
-
-    try:
-        drawing = st.session_state["predict_user_drawing"]
-        reason = st.session_state["predict_user_reason"]
-        
-        st.text("캔버스")
-        answer_canvas_tab1 = st.container(border=True)
-        st.text("예상의 이유")
-        answer_explanation_tab2 = st.container(border=True)
-        answer_canvas_tab1.image(drawing)
-        answer_explanation_tab2.write(reason)
-    except:
-        st.error("아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)")
 
 # 모델 선택 메뉴
 selected_model = "gpt-4o-mini"
@@ -159,11 +263,13 @@ def generate_chain(model_name="gpt-4o-mini"):
     **설명 전략:**
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 안내하세요.
         if operation == "예비실험실": 힘과 운동 방향의 각도를 조정하면서 원운동의 조건을 탐구해보도록 안내합니다.
+        elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 어떨 때 행성이 원운동이 일어날 수 있을지 조작해보도록 안내합니다.
         elif operation == "내 실험실": 시뮬레이션 위에 있는 입력창에 내가 생각하는 힘의 방향이나 그 외 다양한 변수를 수정해보도록 안내합니다.
 
     **핵심 개념 질문 전략:**  
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 질문하여 학생의 생각을 유도하세요.
         if operation == "예비실험실": 힘의 방향과 물체의 운동 궤도 사이의 관계를 탐구해보도록 유도합니다.
+        elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 중력이 무슨 역할을 하는지 탐구해보도록 유도합니다.
         elif operation == "내 실험실": 
             시뮬레이션 위에 있는 입력창에 어떻게 시뮬레이션을 수정하고 싶은지 작성할 수 있도록 예시와 같은 방법으로 학생의 생각을 유도합니다.
             예시:
@@ -202,10 +308,7 @@ def generate_chain(model_name="gpt-4o-mini"):
 with st.sidebar:
 
     options = ["예비실험실", "내 실험실"]
-    operation = st.pills("어떤 시뮬레이션을 하고 있는지 선택해주세요", options, selection_mode="single")
-
-    if operation is None:
-        operation = DEFAULT_OPERATION
+    operation = st.pills("(어떤 시뮬레이션을 하고 있는지 선택해주세요)", options, selection_mode="single")
 
     # 초기화 버튼 생성
     st.text("AI튜터와 대화하기")
@@ -215,6 +318,9 @@ with st.sidebar:
         for chat_message in st.session_state["tutor_messages"]:
            messages.chat_message(chat_message.role).write(chat_message.content)
 
+    if operation is None:
+        operation = DEFAULT_OPERATION
+
     # 새로운 메시지를 추가
     def add_message(role, message):
         st.session_state["tutor_messages"].append(ChatMessage(role=role, content=message))
@@ -222,23 +328,8 @@ with st.sidebar:
     # 이전 대화 기록 출력
     print_messages()
 
-    st.text("추천질문")
-    col1, col2 = st.columns(2)
-    placeholder1 = col1.empty()
-    placeholder2 = col2.empty()
+    if user_input := st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!"):
 
-    # 키워드 질문 처리
-    kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
-    kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
-    kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
-
-    # 사용자의 입력
-    user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
-
-
-    if kw_button_1:
-        user_input = kw_1
-        # 답변 요청
         conv_chain = generate_chain(selected_model)
 
         # 사용자의 입력
@@ -262,79 +353,6 @@ with st.sidebar:
         # 대화기록을 저장한다.
         add_message("user", user_input)
         add_message("assistant", ai_answer)
-
-
-        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
-        placeholder1.button(label=kw_1, use_container_width=True)
-        placeholder2.button(label=kw_2, use_container_width=True)
-
-
-    if kw_button_2:
-        user_input = kw_2
-
-        # 답변 요청
-        conv_chain = generate_chain(selected_model)
-
-        # 사용자의 입력
-        messages.chat_message("user").write(user_input)
-
-        with messages.chat_message("assistant"):
-            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-            container = st.empty()
-            generator = conv_chain.stream(
-                {
-                    "input": user_input,
-                    "current_operation": operation
-                },
-                config={"configurable": {"session_id": "ab12"}}
-            )
-            ai_answer = ""
-            for token in generator:
-                ai_answer += token.content
-                container.markdown(ai_answer)
-
-        # 대화기록을 저장한다.
-        add_message("user", user_input)
-        add_message("assistant", ai_answer)
-
-
-        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
-        placeholder1.button(label=kw_1, use_container_width=True)
-        placeholder2.button(label=kw_2, use_container_width=True)
-
-
-    # 만약에 사용자 입력이 들어오면...
-    if user_input and not kw_button_1 and not kw_button_2:
-        # 답변 요청
-        conv_chain = generate_chain(selected_model)
-
-        # 사용자의 입력
-        messages.chat_message("user").write(user_input)
-
-        with messages.chat_message("assistant"):
-            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-            container = st.empty()
-            generator = conv_chain.stream(
-                {
-                    "input": user_input,
-                    "current_operation": operation
-                },
-                config={"configurable": {"session_id": "ab12"}}
-            )
-            ai_answer = ""
-            for token in generator:
-                ai_answer += token.content
-                container.markdown(ai_answer)
-
-        # 대화기록을 저장한다.
-        add_message("user", user_input)
-        add_message("assistant", ai_answer)
-
-
-        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
-        placeholder1.button(label=kw_1, use_container_width=True)
-        placeholder2.button(label=kw_2, use_container_width=True)
-
 
     # facts = st.text_area(
     #     label="관찰하면서 알게 된 것들을 적어봅시다.",
@@ -368,28 +386,6 @@ operation = "예비실험실"
 
 with st.container(border=True):
     tab1, tab2 = st.tabs(["예비실험실", "내 실험실"])
-
-    # Create columns with specific ratios
-    col1, col2, col3 = st.columns([5, 2, 2])
-    # Place the button in the last column
-    with col1:
-        if st.button(
-            label="이전단계로",
-            icon="⏪",
-            help="생각하기로 이동하기",
-            type="primary"
-        ):
-            st.switch_page("pages_group/02_생각하기.py")
-
-    # Place the button in the last column
-    with col3:
-        if st.button(
-            label="다음단계로",
-            icon="⏩",
-            help="돌아보기로 이동하기",
-            type="primary"
-        ):
-            st.switch_page("pages_group/04_돌아보기.py")
 
     with tab1: 
         operation= "예비실험실"
@@ -455,20 +451,36 @@ with st.container(border=True):
         
         # 수정된 시뮬레이션이 있는 경우
         if os.path.exists('./simulation/simulation_user.py') and st.session_state.last_input:
-            st.info("🔄 수정된 시뮬레이션이 실행 중입니다")
             
             # 사용자 입력 받기
             user_input = st.chat_input("🤖 시뮬레이션을 어떻게 더 수정하고 싶은지 AI에게 설명해주세요")
             
             # 원본으로 돌아가기 버튼
-            if st.button("원본 시뮬레이션으로 돌아가기"):
-                if 'simulation_user' in sys.modules:
-                    del sys.modules['simulation_user']
-                os.remove('./simulation/simulation_user.py')
-                st.session_state.current_code = st.session_state.original_code
-                st.session_state.last_input = ''
+            if 'show_confirm_dialog' not in st.session_state:
+                st.session_state.show_confirm_dialog = False
+
+            if st.button("원본 시뮬레이션으로 돌아가기", use_container_width=True):
+                st.session_state.show_confirm_dialog = True
                 st.rerun()
-                simulation.init_simulation_state()
+
+            if st.session_state.show_confirm_dialog:
+                with st.container():
+                    st.warning("원본 시뮬레이션으로 돌아갑니까?")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("예", key="confirm_yes", type="primary", use_container_width=True):
+                            if 'simulation_user' in sys.modules:
+                                del sys.modules['simulation_user']
+                            os.remove('./simulation/simulation_user.py')
+                            st.session_state.current_code = st.session_state.original_code
+                            st.session_state.last_input = ''
+                            st.session_state.show_confirm_dialog = False
+                            st.rerun()
+                            simulation.init_simulation_state()
+                    with col2:
+                        if st.button("아니오", key="confirm_no", use_container_width=True):
+                            st.session_state.show_confirm_dialog = False
+                            st.rerun()
             
             # 사용자가 입력한 경우
             if user_input and user_input != st.session_state.get('last_input', ''):
@@ -553,14 +565,35 @@ with st.container(border=True):
                     if 'simulation_user' in sys.modules:
                         del sys.modules['simulation_user']
                     from simulation.simulation_user import main
-                    st.divider()
                     main()
-                    
-                    # Display explanation below simulation
+                    # 수정된 코드에 대한 안내 문구
                     if "current_explanation" in st.session_state:
-                        st.markdown("### ")
-                        st.markdown(st.session_state.current_explanation)
-                    
+                        st.markdown(f"""
+                            <style>
+                            .overlay-message {{
+                                position: absolute;
+                                top: 100%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                            background-color: rgba(200, 255, 200, 0.95);
+                            margin: 5px;
+                            padding: 5px;
+                            border-radius: 10px;
+                            border: 2px solid #4CAF50;
+                            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+                            z-index: 1000;
+                            text-align: center;
+                            font-size: 14px;
+                            font-weight: 500;
+                            width: 100%;
+                            color: #1E3A8A;
+                            }}
+                        </style>
+                        <div class="overlay-message">
+                            {st.session_state.current_explanation}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    st.divider()
                     fixingNow = False
                     # 시뮬레이션 실행 전 컨테이너 초기화
                     success = True  # 성공적으로 실행됨
@@ -630,30 +663,55 @@ with st.container(border=True):
         
         # 기본 시뮬레이션 실행 중인 경우
         else:
-            st.success("✨ 현재는 힘이 작용하고 있지 않습니다. 원운동이 되려면 어떻게 힘이 작용해야 할까요?")
-
-            user_input = st.chat_input("🤖아래 시뮬레이션을 어떻게 수정하고 싶은지 AI에게 설명해주세요")
+            user_input = st.chat_input("🤖 아래 시뮬레이션을 어떻게 수정하고 싶은지 AI에게 설명해주세요")
             
             # 사용자의 답변을 반영한 시뮬레이션 보기 버튼 추가
-            if st.button("또는, '문제'에서 답한 내용을 시뮬레이션에 반영하기"):
-                if "predict_user_reason" in st.session_state and "predict_user_drawing" in st.session_state:
-                    user_input_already = f"""
-                    사용자의 설명: {st.session_state['predict_user_reason']}
-                    사용자의 그림 설명: {st.session_state['predict_user_drawing']}
+            button_container = st.empty()
+            with button_container:
+                if st.button("**✨ 또는, '생각하기'에서 답한 내용을 시뮬레이션에 반영하기 ✨**", key="simulation-button", use_container_width=True):
+                    if "predict_user_reason" in st.session_state and "predict_user_drawing" in st.session_state:
+                        user_input_already = f"""
+                        사용자의 설명: {st.session_state['predict_user_reason']}
+                        사용자의 그림 설명: {st.session_state['predict_user_drawing']}
 
-                    위 내용을 바탕으로 시뮬레이션을 수정해주세요.
-                    """
-                    user_input = user_input_already
-                    
-                else:
-                    st.warning("먼저 '문제' 페이지에서 답변을 입력해주세요.")
+                        사용자의 설명과 그림을 참고하여 시뮬레이션을 수정해주세요.
+                        """
+                        user_input = user_input_already
+                        
+                    else:
+                        st.warning("먼저 '생각하기' 페이지에서 답변을 입력해주세요.")
                     
             # 기본 시뮬레이션 실행
             if not user_input and not fixingNow:
                 from simulation.simulation import main
-                st.divider()
                 main()
-            
+                # 최초 안내 문구
+                st.markdown("""
+                    <style>
+                    .overlay-message {
+                        position: absolute;
+                        top: 100%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background-color: rgba(200, 208, 255, 0.95);
+                        padding: 5px;
+                        margin: 5px;
+                        border-radius: 10px;
+                        border: 2px solid #4A90E2;
+                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+                        z-index: 1000;
+                        text-align: center;
+                        font-size: 14px;
+                        font-weight: 500;
+                        width: 100%;
+                        color: #1E3A8A;
+                    }
+                    </style>
+                    <div class="overlay-message">
+                        ℹ️ 현재는 힘이 작용하고 있지 않습니다. 원운동이 되려면 어떻게 힘이 작용해야 할까요?
+                    </div>
+                """, unsafe_allow_html=True)
+                st.divider()
             # 사용자가 입력한 경우
             if user_input and user_input != st.session_state.get('last_input', ''):
                 st.session_state.last_input = user_input
@@ -725,4 +783,26 @@ with st.container(border=True):
                             
                     except Exception as e:
                         st.error(f"코드 수정 중 오류가 발생했습니다: {str(e)}")
-# operation == "PhET": st.components.v1.iframe("https://phet.colorado.edu/sims/html/my-solar-system/latest/my-solar-system_all.html?locale=ko", height=800, width=1000)
+
+
+# Create columns with specific ratios
+col1, col2, col3 = st.columns([5, 2, 2])
+# Place the button in the last column
+with col1:
+    if st.button(
+        label="이전단계로",
+        icon="⏪",
+        help="생각하기로 이동하기",
+        type="primary"
+    ):
+        st.switch_page("pages_group/02_생각하기.py")
+
+# Place the button in the last column
+with col3:
+    if st.button(
+        label="다음단계로",
+        icon="⏩",
+        help="돌아보기로 이동하기",
+        type="primary"
+    ):
+        st.switch_page("pages_group/04_돌아보기.py")

@@ -444,7 +444,7 @@ if is_end:
         st.session_state.balloons_done = True
 
 # End 상태일 때는 입력창을 비활성화
-placeholder = "답변을 입력하세요." if not is_end else "복습이 완료되었습니다."
+placeholder = "🧑🏻‍🏫 AI 보조교사의 질문에 대한 답변을 작성해주세요." if not is_end else "복습이 완료되었습니다."
 if user_input := st.chat_input(placeholder, key="qa_chat_input", disabled=is_end):
     process_answer(user_input)
 

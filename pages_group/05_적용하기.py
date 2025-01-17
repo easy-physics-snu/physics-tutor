@@ -102,7 +102,7 @@ if "messages_application" not in st.session_state:
 feedback_container = st.container(border=True, height=500)
 
 # 사용자의 입력
-user_input_question = st.chat_input(" 답변을 작성해주거나, AI튜터에게 궁금한 내용을 물어보세요!")
+user_input_question = st.chat_input("🧑🏻‍🏫 AI 보조교사의 질문에 대한 답변을 작성해주세요.")
 
 
 # 적용 질문(나중엔 DB에서 불러오면 좋을 듯)
@@ -426,7 +426,7 @@ with st.sidebar:
     print_messages_tutor()
 
     # 사용자의 입력
-    user_input_tutor = st.chat_input("궁금한 내용을 물어보세요!")
+    user_input_tutor = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
 
     # if len(st.session_state["messages_application_tutor"]) == 0:
     #     # Display the question directly

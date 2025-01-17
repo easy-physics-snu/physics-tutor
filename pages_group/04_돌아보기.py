@@ -95,8 +95,8 @@ st.title("돌아보기 🧐")
 st.info("- 하단의 캔버스에 최종적으로 생각한 **(1)답안**과 함께 그렇게 생각한 **(2)이유**를 적어주세요. \n - 정답을 적으면 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다. \n - AI 튜터와 대화하면서 내가 잘못 알고 있던 개념은 없는지 파악하고 내 이해도를 더 정교화해보세요.")
 
 
-problem_image = "images/problem_1.png"
-
+#TODO 문제 이미지가 있어야 AI튜터가 학습자 제출 답안에 대한 의미 있는 피드백을 제공 가능한지 확인
+# PROBLEM_IMAGE = "images/problem_1.png"
 
 tab1, tab2 = st.tabs(['문제 상황', '문제 정답'])
 
@@ -106,7 +106,20 @@ with tab1:
         expanded=True
         ):
         main_tab1 = st.container(border=True)
-        main_tab1.image(problem_image)
+        main_tab1.write("""무중력 상태의 우주 공간에 새로운 행성을 찾아 다니는 인공 위성이 있습니다. \n
+드디어! 새로운 행성을 발견한 인공 위성은 행성의 원형 궤도를 따라 일정한 속력으로 **등속 원운동**을 하기 위해 추진력의 방향을 조정 하려고 합니다. \n
+**인공 위성에 적용시켜야 하는 (1) 힘을 아래 캔버스에 원형궤도와 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에  적어봅시다. (그림은 오른쪽에 제시되어 있는 예시의 형태를 참고하여 그리기)**
+""")
+        with main_tab1:
+            _, col2, col3, _ = st.columns(4, vertical_alignment='center')
+            col2.image(
+                image="images/satellite_moon.png",
+            )
+            col3.image(
+                image="images/satellite_orbit.png",
+                caption="그림 작성 예시",
+                width=200
+            )
 
 
     with st.popover(

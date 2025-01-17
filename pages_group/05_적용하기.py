@@ -1,21 +1,35 @@
 import os
-import streamlit as st
 import re
+import streamlit as st
 import time
 
+from typing import List
 from langchain_core.messages.chat import ChatMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import StrOutputParser
 
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_openai import ChatOpenAI #, OpenAIEmbeddings
 # from langchain_ollama import ChatOllama
 
+from pydantic import BaseModel, Field
+from langchain_core.messages import BaseMessage
+
 from langchain_teddynote import logging
 
+
 st.session_state.api_key = st.secrets["openai_api_key"]
+
+# 처음 1번만 실행하기 위한 코드
+if "messages_application" not in st.session_state:
+    # 대화기록을 저장하기 위한 용도로 생성한다.
+    st.session_state["messages_application"] = []
+
+# 처음 1번만 실행하기 위한 코드
+if "messages_application_tutor" not in st.session_state:
+    # 대화기록을 저장하기 위한 용도로 생성한다.
+    st.session_state["messages_application_tutor"] = []
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
@@ -28,6 +42,41 @@ if not os.path.exists(".cache"):
 
 # 세션 기록을 저장할 딕셔너리
 store = {} 
+
+class InMemoryHistory(BaseChatMessageHistory, BaseModel):
+    """In memory implementation of chat message history."""
+
+    messages: List[BaseMessage] = Field(default_factory=list)
+
+    def add_messages(self, messages: List[BaseMessage]) -> None:
+        """Add a list of messages to the store"""
+        self.messages.extend(messages)
+
+    def clear(self) -> None:
+        self.messages = []
+
+
+def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
+    if session_id not in store:
+        store[session_id] = InMemoryHistory()
+    return store[session_id]
+
+# 이전 대화를 출력
+def print_messages():
+    for chat_message in st.session_state["messages_application"]:
+        st.chat_message(chat_message.role).write(chat_message.content)
+
+# 새로운 메시지를 추가
+def add_message(role, message):
+    st.session_state["messages_application"].append(ChatMessage(role=role, content=message))
+
+# 세션 ID를 기반으로 세션 기록을 가져오는 함수
+def get_session_history(session_ids: str) -> BaseChatMessageHistory:
+    print(session_ids)
+    if session_ids not in store:  # 세션 ID가 store에 없는 경우
+        # 새로운 ChatMessageHistory 객체를 생성하여 store에 저장
+        store[session_ids] = ChatMessageHistory()
+    return store[session_ids]  # 해당 세션 ID에 대한 세션 기록 반환
 
 
 st.title("적용하기 💡")
@@ -50,20 +99,10 @@ if "messages_application" not in st.session_state:
     st.session_state["messages_application"] = []
 
 
-feedback_container = st.container(border=True)
+feedback_container = st.container(border=True, height=500)
 
-# Create columns with specific ratios
-col1, col2, col3 = st.columns([5, 2, 2])
-
-# Place the button in the last column
-with col1:
-    if st.button(
-        label="이전단계로",
-        icon="⏪",
-        help="돌아보기로 이동하기",
-        type="primary"
-    ):
-        st.switch_page("pages_group/04_돌아보기.py")
+# 사용자의 입력
+user_input_question = st.chat_input(" 답변을 작성해주거나, AI튜터에게 궁금한 내용을 물어보세요!")
 
 
 # 적용 질문(나중엔 DB에서 불러오면 좋을 듯)
@@ -76,34 +115,7 @@ applyingModeledAnswer = "지구가 달에 지구 중심방향으로 향하는 �
 essential_contents = "등속 원운동"
 
 
-# 사이드바에 점수 표시
-with st.sidebar:
-    # st.header("모범 답안과의 일치율")
-    # # 점수 표시를 위한 컨테이너들을 미리 생성
-    # score_container = st.empty()
-    # score_text_container = st.empty()
-
-    st.text("AI튜터와 대화하기")
-    messages = st.container(height=400)
-    success_togle = st.empty()
-
-    # 이전 대화를 출력
-    def print_messages():
-        for chat_message in st.session_state["messages_application"]:
-            messages.chat_message(chat_message.role).write(chat_message.content)
-
-    # 새로운 메시지를 추가
-    def add_message(role, message):
-        st.session_state["messages_application"].append(ChatMessage(role=role, content=message))
-
-    # 세션 ID를 기반으로 세션 기록을 가져오는 함수
-    def get_session_history(session_ids: str) -> BaseChatMessageHistory:
-        print(session_ids)
-        if session_ids not in store:  # 세션 ID가 store에 없는 경우
-            # 새로운 ChatMessageHistory 객체를 생성하여 store에 저장
-            store[session_ids] = ChatMessageHistory()
-        return store[session_ids]  # 해당 세션 ID에 대한 세션 기록 반환
-
+with feedback_container:
 
     # 답변 체인 생성
     def create_chain(model_name="gpt-4o"):
@@ -176,12 +188,12 @@ with st.sidebar:
 
         # llm_scaffolding = ChatOllama(model="exaone3.5:7.8b-instruct-q8_0", temperature=0)
 
-        def process_input(user_input): # , is_init=False):
+        def process_input(user_input, is_init=False):
             # Only display user message if it's not the initial message
-            # if not is_init:
-            #     with messages.chat_message("user"):
-            #         st.write(user_input)
-            add_message("human", user_input)
+            if not is_init:
+                with st.chat_message("user"):
+                    st.write(user_input)
+                add_message("human", user_input)
 
             # First, get the relevance check
             relevance_chain = RunnableWithMessageHistory(
@@ -239,12 +251,10 @@ with st.sidebar:
             return final_response
         
         return process_input
-
+    
     # 이전 대화 기록 출력
     print_messages()
 
-    # 사용자의 입력
-    user_input = st.chat_input(" 답변을 작성해주거나, AI튜터에게 궁금한 내용을 물어보세요!")
 
     # 체인 생성
     if "application_chain" not in st.session_state:
@@ -252,30 +262,36 @@ with st.sidebar:
 
     chain = st.session_state["application_chain"]
 
+    # # 사이드바에 relevance score를 표시할 컨테이너 생성
+    # if "relevance_score" not in st.session_state:
+    #     st.session_state["relevance_score"] = 0
 
+    # # 사이드바에 점수 표시
+    # with st.sidebar:
+    #     st.header("모범 답안과의 일치율")
+    #     # 점수 표시를 위한 컨테이너들을 미리 생성
+    #     score_container = st.empty()
+    #     score_text_container = st.empty()
     if len(st.session_state["messages_application"]) == 0:
         # Display the question directly
-        with messages.chat_message("assistant"):
+        with st.chat_message("assistant"):
             st.markdown(applyingQuestion)
+        
         # Add the question to history
         add_message("assistant", applyingQuestion)
 
     else:
-        if user_input:            
-            # 사용자의 입력
-            messages.chat_message("user").write(user_input)
+        if user_input_question:
             # Process the message with our chain
-            response = chain(user_input)
+            response = chain(user_input_question, False)
             
             # relevance score 계산 및 업데이트
             try:
                 # 80% 이상 달성 시 축하 효과와 마무리 메시지
                 if st.session_state["score"] >= 80:
                     st.balloons()
-
-                    success_togle.success("축하합니다! 충분히 잘 이해하셨네요. \n 오른쪽 하단에 나온 모범 답안을 확인해주세요:)")
-                    with feedback_container:
-                        st.info("모범 답안은 다음과 같습니다.")
+                    with st.chat_message("assistant"):
+                        st.write(" 축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.")
                         st.markdown("   [**" + f"{applyingModeledAnswer}"+"**]")
                         if len(st.session_state['missing_contents']) > 0:
                             missing_text = ''.join(st.session_state['missing_contents']).strip()
@@ -305,7 +321,7 @@ with st.sidebar:
             
             # 대화가 완료되지 않은 경우에만 AI 응답 표시
             if not st.session_state.get("conversation_completed", False):
-                with messages.chat_message("assistant"):
+                with st.chat_message("assistant"):
                     texts = response.content
                     text_parts = texts.split() 
                     placeholder = st.empty()
@@ -317,3 +333,144 @@ with st.sidebar:
                 
                 # AI 답변도 대화기록에 저장
                 add_message("assistant", response.content)
+
+# 사이드바 생성
+with st.sidebar:
+
+    st.text("AI튜터와 대화하기")
+    messages = st.container(height=400)
+    ai_info = st.empty()
+
+    # 모델 선택 메뉴
+    selected_model = "gpt-4o" # st.selectbox("LLM 선택", ["gpt-4o", "gpt-4o-mini"], index=0)
+
+    # 사이드바 시스템 체인 생성
+    def generate_chain(model_name=selected_model):
+        # 현재 선택된 operation 값 가져오기
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", 
+            """당신은 친절하고 대화형 학습을 돕는 **물리 튜터**입니다.  
+        **목표:** 학생이 '등속 원운동'에서 힘의 방향이 물체의 운동 궤적에 어떻게 작용하는지를 이해하도록 돕는 것입니다. 정답 화면을 제공한 후, 학생이 정답을 논리적으로 이해하고 설명할 수 있도록 대화형 질문과 설명을 진행하세요.  
+        **중요:**  
+        1. 정답을 단순히 제시하는 데 그치지 말고, 학생이 그 이유를 이해하고 자신의 언어로 정리할 수 있도록 돕습니다.  
+        2. 학생의 관점과 질문을 존중하며, 친근한 존댓말로 대화하세요.  
+        3. 각 응답은 간결하고 명확하게 작성하세요(2문단 이내).  
+        4. 학생이 이해하지 못한 부분이 있을 경우, 추가적인 설명과 예시를 활용해 개념을 명확히 전달하세요.
+
+        **프롬프트 시작 제안:**  
+        (정답 화면을 학생에게 보여준 후 대화를 시작한다고 생각하세요.)
+        1. **정답 화면 제시 후**  
+        - "이 화면에서 물체가 등속 원운동을 유지하기 위해 힘이 어떤 방향으로 작용하고 있는지 보여주고 있어요. 여기서 힘의 방향이 원의 중심을 향하는 것을 확인할 수 있습니다."  
+        2. **첫 질문:**  
+        - "이 화면에서 힘이 왜 원의 중심을 향해야 하는지 생각해 보셨나요? 지금까지의 관찰과 그림을 바탕으로 한 번 설명해 보세요."  
+
+        **대화 전략:**  
+        1. 학생의 답변을 기반으로 질문을 이어가며 올바른 개념을 도출하도록 돕습니다.  
+        2. 대화의 초점은 학생이 '등속 원운동에서 속도의 방향이 계속 바뀌기 때문에 중심 방향의 힘(구심력)이 필요하다'는 점을 논리적으로 이해하는 데 맞춰야 합니다.  
+        3. 정답 화면을 참고하며 학생의 추론 과정을 구체화하도록 질문을 활용하세요.
+
+        **핵심 질문 유도:**  
+        - "등속 원운동에서는 물체의 속력이 일정하지만, 속도의 방향은 계속 변합니다. 속도의 방향을 바꾸기 위해 힘이 어떤 역할을 한다고 생각하나요?"  
+        - "이 정답 화면에서 보이는 힘의 방향이 속도와 직각을 이루는 이유는 무엇일까요?"  
+        - "만약 힘이 중심을 향하지 않는다면, 물체의 운동 궤적은 어떻게 될까요?"  
+
+        **추가적인 설명 제공:**  
+        학생이 답을 이해하지 못하거나 잘못된 추론을 제시했을 경우, 올바른 개념을 설명하세요.  
+        - "등속 원운동은 물체가 일정한 속력으로 원 궤도를 따라 움직이는 운동이에요. 하지만 속도의 방향이 계속 바뀌기 때문에 가속도가 존재하게 됩니다. 이 가속도를 만들어내기 위해서는 항상 원의 중심 방향으로 힘이 작용해야 해요. 이를 구심력이라고 합니다."  
+        - "만약 힘이 중심 방향으로 작용하지 않는다면, 물체는 직선으로 운동을 계속하려는 경향(관성)에 의해 원 궤도를 벗어나게 됩니다."  
+
+        **대화 마무리:**  
+        학생이 자신의 언어로 개념을 정리할 수 있도록 유도하세요.  
+        - "지금까지 배운 내용을 바탕으로 정리해 볼까요? 물체가 등속 원운동을 유지하기 위해 힘의 방향이 왜 원의 중심을 향해야 하는지 설명해 주세요."  
+        - "정답 화면을 다시 보면서 힘의 방향과 운동 궤적의 관계를 한 번 더 정리해 보세요. 왜 등속 원운동에서 중심 방향의 힘이 필요한지, 그것이 어떻게 운동을 유지하는지 설명할 수 있나요?"  
+
+        **중요 사항:**  
+        - 학생이 스스로 설명하려고 할 때 격려하며, 잘못된 표현이 있어도 바로 정정하지 말고 추가 질문으로 사고를 확장하도록 유도하세요.  
+        - 정답 화면과 학생의 추론 과정을 연결시키는 데 집중하며, 이해가 완벽해질 때까지 인내심을 가지고 돕습니다."""
+            ),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{input}")
+        ])
+
+        # 객체 생성
+        llm = ChatOpenAI(
+            temperature=0,
+            model_name=model_name,
+            openai_api_key = st.session_state.api_key
+        )
+
+
+        chain = prompt | llm
+        chain_with_history = RunnableWithMessageHistory(
+            chain,
+            get_by_session_id,
+            input_messages_key="input",
+            history_messages_key="history",
+        )
+
+        return chain_with_history
+
+
+    # 이전 대화를 출력
+    def print_messages_tutor():
+        for chat_message in st.session_state["messages_application_tutor"]:
+            messages.chat_message(chat_message.role).write(chat_message.content)
+
+
+    # 새로운 메시지를 추가
+    def add_message_tutor(role, message):
+        st.session_state["messages_application_tutor"].append(ChatMessage(role=role, content=message))
+
+
+    # 이전 대화 기록 출력
+    print_messages_tutor()
+
+    # 사용자의 입력
+    user_input_tutor = st.chat_input("궁금한 내용을 물어보세요!")
+
+    # if len(st.session_state["messages_application_tutor"]) == 0:
+    #     # Display the question directly
+    #     with messages.chat_message("assistant"):
+    #         st.markdown(applyingQuestion)
+        
+    #     # Add the question to history
+    #     add_message("assistant", applyingQuestion)
+
+    if user_input_tutor:
+        # 답변 요청
+        conv_chain = generate_chain(selected_model)
+
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input_tutor)
+
+        with messages.chat_message("assistant"):
+            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+            container = st.empty()
+            generator = conv_chain.stream(
+                {
+                    "input": user_input_tutor,
+                },
+                config={"configurable": {"session_id": "ab12"}}
+            )
+            ai_answer = ""
+            for token in generator:
+                ai_answer += token.content
+                container.markdown(ai_answer)
+
+        # 대화기록을 저장한다.
+        add_message_tutor("user", user_input_tutor)
+        add_message_tutor("assistant", ai_answer)
+
+
+# Create columns with specific ratios
+col1, col2, col3 = st.columns([5, 2, 2])
+
+# Place the button in the last column
+with col1:
+    if st.button(
+        label="이전단계로",
+        icon="⏪",
+        help="돌아보기로 이동하기",
+        type="primary"
+    ):
+        st.switch_page("pages_group/04_돌아보기.py")

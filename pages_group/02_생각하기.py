@@ -29,6 +29,8 @@ os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
 os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
+PROBLEM_IMAGE = "images/problem_1.png"
+
 # Initialize session state for the button
 if 'button_pressed' not in st.session_state:
     st.session_state.button_pressed = False
@@ -124,14 +126,25 @@ def disalble_submit_button():
     st.session_state["submit_button_disabled"] = True
 
 
-problem_image = "images/problem_1.png"
-
 with st.expander(
     label="문제 보기 🔍",
     expanded=True
     ):
     main_tab1 = st.container(border=True)
-    main_tab1.image(problem_image)
+    main_tab1.write("""무중력 상태의 우주 공간에 새로운 행성을 찾아 다니는 인공 위성이 있습니다. \n
+드디어! 새로운 행성을 발견한 인공 위성은 행성의 원형 궤도를 따라 일정한 속력으로 **등속 원운동**을 하기 위해 추진력의 방향을 조정 하려고 합니다. \n
+**인공 위성에 적용시켜야 하는 (1) 힘을 아래 캔버스에 원형궤도와 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에  적어봅시다. (그림은 오른쪽에 제시되어 있는 예시의 형태를 참고하여 그리기)**
+""")
+    with main_tab1:
+        _, col2, col3, _ = st.columns(4, vertical_alignment='center')
+        col2.image(
+            image="images/satellite_moon.png",
+        )
+        col3.image(
+            image="images/satellite_orbit.png",
+            caption="그림 작성 예시",
+            width=200
+        )
 
 
 st.text("문제의 답을 예상해보세요.")
@@ -274,7 +287,7 @@ with st.sidebar:
     placeholder1 = col1.empty()
     placeholder2 = col2.empty()
 
-    #TODO 키워드 질문 처리
+    # 키워드 질문 처리
     kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
     kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
     kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
@@ -286,7 +299,7 @@ with st.sidebar:
     if kw_button_1:
         user_input = kw_1
         # 이미지 파일을 처리
-        image_filepath = process_imagefile(problem_image)
+        image_filepath = process_imagefile(PROBLEM_IMAGE)
         # 답변 요청
         response = generate_answer(
             image_filepath, system_prompt, user_input, selected_model
@@ -318,7 +331,7 @@ with st.sidebar:
         user_input = kw_2
 
         # 이미지 파일을 처리
-        image_filepath = process_imagefile("images/problem_1.png")
+        image_filepath = process_imagefile(PROBLEM_IMAGE)
         # 답변 요청
         response = generate_answer(
             image_filepath, system_prompt, user_input, selected_model
@@ -349,7 +362,7 @@ with st.sidebar:
     # 만약에 사용자 입력이 들어오면...
     if user_input and not kw_button_1 and not kw_button_2:
         # 이미지 파일을 처리
-        image_filepath = process_imagefile("images/problem_1.png")
+        image_filepath = process_imagefile(PROBLEM_IMAGE)
         # 답변 요청
         response = generate_answer(
             image_filepath, system_prompt, user_input, selected_model
@@ -371,3 +384,6 @@ with st.sidebar:
         add_message("user", user_input)
         add_message("assistant", ai_answer)
 
+        kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)

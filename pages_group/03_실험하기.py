@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 # from langchain_ollama import ChatOllama
 
+from modules.keywords import create_keyword
+
 import time
 import importlib
 import simulation.simulation as simulation
@@ -103,7 +105,20 @@ with st.expander(
         expanded=True
     ):
     main_tab1 = st.container(border=True)
-    main_tab1.image("images/problem_1.png")
+    main_tab1.write("""무중력 상태의 우주 공간에 새로운 행성을 찾아 다니는 인공 위성이 있습니다. \n
+드디어! 새로운 행성을 발견한 인공 위성은 행성의 원형 궤도를 따라 일정한 속력으로 **등속 원운동**을 하기 위해 추진력의 방향을 조정 하려고 합니다. \n
+**인공 위성에 적용시켜야 하는 (1) 힘을 아래 캔버스에 원형궤도와 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에  적어봅시다. (그림은 오른쪽에 제시되어 있는 예시의 형태를 참고하여 그리기)**
+""")
+    with main_tab1:
+        _, col2, col3, _ = st.columns(4, vertical_alignment='center')
+        col2.image(
+            image="images/satellite_moon.png",
+        )
+        col3.image(
+            image="images/satellite_orbit.png",
+            caption="그림 작성 예시",
+            width=200
+        )
 
 with st.popover(
         label="내 이전 답안 보기 📄",
@@ -144,13 +159,11 @@ def generate_chain(model_name="gpt-4o-mini"):
     **설명 전략:**
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 안내하세요.
         if operation == "예비실험실": 힘과 운동 방향의 각도를 조정하면서 원운동의 조건을 탐구해보도록 안내합니다.
-        elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 어떨 때 행성이 원운동이 일어날 수 있을지 조작해보도록 안내합니다.
         elif operation == "내 실험실": 시뮬레이션 위에 있는 입력창에 내가 생각하는 힘의 방향이나 그 외 다양한 변수를 수정해보도록 안내합니다.
 
     **핵심 개념 질문 전략:**  
     1. 현재 선택되어 있는 {current_operation} 값에 따라 각각 다르게 질문하여 학생의 생각을 유도하세요.
         if operation == "예비실험실": 힘의 방향과 물체의 운동 궤도 사이의 관계를 탐구해보도록 유도합니다.
-        elif operation == "PhET": 행성의 위치나 크기를 조작해보면서, 중력이 무슨 역할을 하는지 탐구해보도록 유도합니다.
         elif operation == "내 실험실": 
             시뮬레이션 위에 있는 입력창에 어떻게 시뮬레이션을 수정하고 싶은지 작성할 수 있도록 예시와 같은 방법으로 학생의 생각을 유도합니다.
             예시:
@@ -189,7 +202,7 @@ def generate_chain(model_name="gpt-4o-mini"):
 with st.sidebar:
 
     options = ["예비실험실", "내 실험실"]
-    operation = st.pills("(어떤 시뮬레이션을 하고 있는지 선택해주세요)", options, selection_mode="single")
+    operation = st.pills("어떤 시뮬레이션을 하고 있는지 선택해주세요", options, selection_mode="single")
 
     if operation is None:
         operation = DEFAULT_OPERATION
@@ -209,8 +222,23 @@ with st.sidebar:
     # 이전 대화 기록 출력
     print_messages()
 
-    if user_input := st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!"):
+    st.text("추천질문")
+    col1, col2 = st.columns(2)
+    placeholder1 = col1.empty()
+    placeholder2 = col2.empty()
 
+    # 키워드 질문 처리
+    kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+    kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
+    kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
+
+    # 사용자의 입력
+    user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
+
+
+    if kw_button_1:
+        user_input = kw_1
+        # 답변 요청
         conv_chain = generate_chain(selected_model)
 
         # 사용자의 입력
@@ -235,26 +263,99 @@ with st.sidebar:
         add_message("user", user_input)
         add_message("assistant", ai_answer)
 
-    facts = st.text_area(
-        label="관찰하면서 알게 된 것들을 적어봅시다.",
-        placeholder="- 변수 조작에 따라 움직임이 달라진 점\n- 예측했던 것과 관찰한 결과가 다른점",
-        height=200,
-        on_change=enalble_submit_button
-    )
 
-    if not facts:
-        disalble_submit_button()
+        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)
 
-    submit_button = st.button(
-        label="제출하기",
-        type="primary",
-        use_container_width=True,
-        disabled=st.session_state["submit_button_disabled"]
-    )
 
-    if submit_button:
-        st.session_state["observation_user_facts"] = facts
-        st.success("제출 완료!")
+    if kw_button_2:
+        user_input = kw_2
+
+        # 답변 요청
+        conv_chain = generate_chain(selected_model)
+
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
+
+        with messages.chat_message("assistant"):
+            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+            container = st.empty()
+            generator = conv_chain.stream(
+                {
+                    "input": user_input,
+                    "current_operation": operation
+                },
+                config={"configurable": {"session_id": "ab12"}}
+            )
+            ai_answer = ""
+            for token in generator:
+                ai_answer += token.content
+                container.markdown(ai_answer)
+
+        # 대화기록을 저장한다.
+        add_message("user", user_input)
+        add_message("assistant", ai_answer)
+
+
+        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)
+
+
+    # 만약에 사용자 입력이 들어오면...
+    if user_input and not kw_button_1 and not kw_button_2:
+        # 답변 요청
+        conv_chain = generate_chain(selected_model)
+
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
+
+        with messages.chat_message("assistant"):
+            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+            container = st.empty()
+            generator = conv_chain.stream(
+                {
+                    "input": user_input,
+                    "current_operation": operation
+                },
+                config={"configurable": {"session_id": "ab12"}}
+            )
+            ai_answer = ""
+            for token in generator:
+                ai_answer += token.content
+                container.markdown(ai_answer)
+
+        # 대화기록을 저장한다.
+        add_message("user", user_input)
+        add_message("assistant", ai_answer)
+
+
+        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)
+
+
+    # facts = st.text_area(
+    #     label="관찰하면서 알게 된 것들을 적어봅시다.",
+    #     placeholder="- 변수 조작에 따라 움직임이 달라진 점\n- 예측했던 것과 관찰한 결과가 다른점",
+    #     height=200,
+    #     on_change=enalble_submit_button
+    # )
+
+    # if not facts:
+    #     disalble_submit_button()
+
+    # submit_button = st.button(
+    #     label="제출하기",
+    #     type="primary",
+    #     use_container_width=True,
+    #     disabled=st.session_state["submit_button_disabled"]
+    # )
+
+    # if submit_button:
+    #     st.session_state["observation_user_facts"] = facts
+    #     st.success("제출 완료!")
 
 
 # 내 실험실 초기 세션 상태 설정

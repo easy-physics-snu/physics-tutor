@@ -20,17 +20,17 @@ from langchain_openai import ChatOpenAI
 # from langchain_ollama import ChatOllama
 # from langchain_anthropic import ChatAnthropic
 
-
+from modules.keywords import create_keyword
 import simulation.simulation as simulation
 
 set_verbose(False)
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
-# os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
-# os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
-# os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
-# os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
+os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
+os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
+os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
+os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 if "submit_button_disabled" not in st.session_state:
     st.session_state["submit_button_disabled"] = True
@@ -328,10 +328,23 @@ with st.sidebar:
     # 이전 대화 기록 출력
     print_messages()
 
-    if user_input := st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!"):
+    st.text("추천질문")
+    col1, col2 = st.columns(2)
+    placeholder1 = col1.empty()
+    placeholder2 = col2.empty()
 
+    # 키워드 질문 처리
+    kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+    kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
+    kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
+
+    # 사용자의 입력
+    user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
+
+    if kw_button_1:
+        user_input = kw_1
+        # 답변 요청
         conv_chain = generate_chain(selected_model)
-
         # 사용자의 입력
         messages.chat_message("user").write(user_input)
 
@@ -353,6 +366,73 @@ with st.sidebar:
         # 대화기록을 저장한다.
         add_message("user", user_input)
         add_message("assistant", ai_answer)
+
+        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)
+
+
+    if kw_button_2:
+        user_input = kw_2
+
+        # 답변 요청
+        conv_chain = generate_chain(selected_model)
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
+
+        with messages.chat_message("assistant"):
+            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+            container = st.empty()
+            generator = conv_chain.stream(
+                {
+                    "input": user_input,
+                    "current_operation": operation
+                },
+                config={"configurable": {"session_id": "ab12"}}
+            )
+            ai_answer = ""
+            for token in generator:
+                ai_answer += token.content
+                container.markdown(ai_answer)
+
+        # 대화기록을 저장한다.
+        add_message("user", user_input)
+        add_message("assistant", ai_answer)
+
+        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)
+
+
+    # 만약에 사용자 입력이 들어오면...
+    if user_input and not kw_button_1 and not kw_button_2:
+        # 답변 요청
+        conv_chain = generate_chain(selected_model)
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
+
+        with messages.chat_message("assistant"):
+            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+            container = st.empty()
+            generator = conv_chain.stream(
+                {
+                    "input": user_input,
+                    "current_operation": operation
+                },
+                config={"configurable": {"session_id": "ab12"}}
+            )
+            ai_answer = ""
+            for token in generator:
+                ai_answer += token.content
+                container.markdown(ai_answer)
+
+        # 대화기록을 저장한다.
+        add_message("user", user_input)
+        add_message("assistant", ai_answer)
+
+        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+        placeholder1.button(label=kw_1, use_container_width=True)
+        placeholder2.button(label=kw_2, use_container_width=True)
 
     # facts = st.text_area(
     #     label="관찰하면서 알게 된 것들을 적어봅시다.",

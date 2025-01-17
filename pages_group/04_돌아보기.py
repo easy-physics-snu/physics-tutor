@@ -438,7 +438,7 @@ with st.sidebar:
         print_messages()
 
         # 사용자의 입력
-        user_input = st.chat_input("궁금한 내용을 물어보세요!")
+        user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
         image_filepath = process_imagefile(st.session_state["explanation_user_drawing"])
 
         # 멀티모달 객체 생성

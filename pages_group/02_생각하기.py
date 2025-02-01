@@ -51,7 +51,7 @@ if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
 st.title("생각하기 🤔")
-st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요.")
+st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤖AI 튜터에게 물어보세요!")
 # 처음 1번만 실행하기 위한 코드
 if "messages_predict" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.

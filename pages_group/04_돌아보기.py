@@ -105,7 +105,7 @@ with left_col:
     message = """
 - 캔버스에 최종적으로 생각한 **(1)답안**과 그 **(2)이유**를 적어주세요.
 - 정답을 적으면 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다.
-- AI 튜터와 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
+- 🧑🏻‍🏫 AI 튜터와 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
 """
     st.info(message)
 
@@ -350,7 +350,7 @@ with st.sidebar:
             else:
                 pass
         else:
-            ai_info.info("내 답안을 제출하면 AI 튜터와 대화가 시작됩니다!")
+            ai_info.info("내 답안을 제출하면 🧑🏻‍🏫 AI 튜터와 대화가 시작됩니다!")
 
     # 모델 선택 메뉴
     selected_model = "gpt-4o-mini" # st.selectbox("LLM 선택", ["gpt-4o", "gpt-4o-mini"], index=0)
@@ -438,7 +438,7 @@ with st.sidebar:
         print_messages()
 
         # 사용자의 입력
-        user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
+        user_input = st.chat_input("🧑🏻‍🏫 AI 튜터의 질문에 대한 답변을 작성해주세요.")
         image_filepath = process_imagefile(st.session_state["explanation_user_drawing"])
 
         # 멀티모달 객체 생성

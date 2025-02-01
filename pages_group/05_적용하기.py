@@ -80,7 +80,7 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
 
 
 st.title("적용하기 💡")
-st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요.")
+st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤖AI 튜터에게 물어보세요!")
 
 st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
 
@@ -102,12 +102,12 @@ if "messages_application" not in st.session_state:
 feedback_container = st.container(border=True, height=500)
 
 # 사용자의 입력
-user_input_question = st.chat_input("🧑🏻‍🏫 AI 보조교사의 질문에 대한 답변을 작성해주세요.")
+user_input_question = st.chat_input("🧑🏻‍🏫 AI 튜터의 질문에 대한 답변을 작성해주세요.")
 
 
 # 적용 질문(나중엔 DB에서 불러오면 좋을 듯)
 applyingQuestion = """
-다시 등장한 🧑🏻‍🏫 AI 보조교사입니다:) 마지막으로, 배운 내용을 새로운 상황에 적용해봅시다! \n
+다시 등장한 🧑🏻‍🏫 AI 튜터입니다:) 마지막으로, 배운 내용을 새로운 상황에 적용해봅시다! \n
 위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?
 """
 

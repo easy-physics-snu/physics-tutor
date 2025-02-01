@@ -27,6 +27,8 @@ os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
+TEXTBOOK_FILE_PATH = "textbooks/physics_textbook.pdf"
+
 # 캐시 디렉토리 생성
 if not os.path.exists(".cache"):
     os.mkdir(".cache")
@@ -107,7 +109,7 @@ def create_chain(retriever, prompt_path="prompts/doc-rag.yaml", model_name="gpt-
     return chain
 
 # 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
-retriever = embed_file("textbooks/physics_textbook_trancated.pdf")
+retriever = embed_file(TEXTBOOK_FILE_PATH)
 selected_model = "gpt-4o"
 selected_prompt = "prompts/doc-rag-scaffold.yaml"
 

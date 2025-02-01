@@ -293,6 +293,7 @@ with tab1:
     if submit_button:
         st.session_state["explanation_user_drawing"] = canvas_result.image_data
         st.session_state["explanation_user_reason"] = reason
+        IMAGE_FILEPATH = process_imagefile(st.session_state["explanation_user_drawing"])
         st.success("제출 완료! 상단의 '문제 정답' 탭에서 답을 확인해보세요:)")
 
 
@@ -439,7 +440,6 @@ with st.sidebar:
 
         # 사용자의 입력
         user_input = st.chat_input("🧑🏻‍🏫 AI 튜터의 질문에 대한 답변을 작성해주세요.")
-        image_filepath = process_imagefile(st.session_state["explanation_user_drawing"])
 
         # 멀티모달 객체 생성
         multimodal = st.session_state["multimodal_chain"]
@@ -449,7 +449,7 @@ with st.sidebar:
             # 답변 요청
             response = multimodal.stream(
                 user_prompt=init_user_input,
-                image_url=image_filepath,
+                image_url=IMAGE_FILEPATH,
             )
             
             with messages.chat_message("assistant"):

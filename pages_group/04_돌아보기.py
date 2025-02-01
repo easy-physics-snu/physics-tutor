@@ -21,6 +21,17 @@ os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 st.session_state["init_user_input"] = False
 
+# 캐시 디렉토리 생성
+if not os.path.exists(".cache"):
+    os.mkdir(".cache")
+
+# 파일 업로드 전용 폴더
+if not os.path.exists(".cache/files"):
+    os.mkdir(".cache/files")
+
+if not os.path.exists(".cache/embeddings"):
+    os.mkdir(".cache/embeddings")
+
 #TODO 문제 이미지가 있어야 AI튜터가 학습자 제출 답안에 대한 의미 있는 피드백을 제공 가능한지 확인
 PROBLEM_IMAGE_PATH = "images/problem_1.png"
 

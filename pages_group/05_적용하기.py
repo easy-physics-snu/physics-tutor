@@ -80,7 +80,7 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
 
 
 st.title("적용하기 💡")
-st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤓**AI 탐구도우미**에게 물어보세요!")
+st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 🧑🏻‍🏫**AI 튜터**와 대화하면서 개념을 새로운 상황에 적용하고 내 이해를 정교화해보세요.")
 
 st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
 

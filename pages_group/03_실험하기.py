@@ -90,7 +90,7 @@ left_col, right_col = info_container.columns([4, 1])
 with left_col:
     message = """
 - 앞에서 제출한 답을 떠올리며 시뮬레이션을 관찰하고 조작해보세요.
-- 시뮬레이션에 대해서 궁금한건 왼쪽 사이드바 🤖AI 튜터에게 질문해보세요.
+- 시뮬레이션에 대해서 궁금한건 🤓**AI 탐구도우미**에게 질문해보세요.
 - ⭐ **[내 실험실]에서는 내가 제출한 답을 시뮬레이션 해 볼 수 있어요** ⭐
 """
     st.info(message)
@@ -311,7 +311,7 @@ with st.sidebar:
     operation = st.pills("(어떤 시뮬레이션을 하고 있는지 선택해주세요)", options, selection_mode="single")
 
     # 초기화 버튼 생성
-    st.text("AI튜터와 대화하기")
+    st.text("AI와 대화하기")
     messages = st.container(height=300)
         
     def print_messages():
@@ -339,7 +339,7 @@ with st.sidebar:
     kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
 
     # 사용자의 입력
-    user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
+    user_input = st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!")
 
     if kw_button_1:
         user_input = kw_1
@@ -533,7 +533,7 @@ with st.container(border=True):
         if os.path.exists('./simulation/simulation_user.py') and st.session_state.last_input:
             
             # 사용자 입력 받기
-            user_input = st.chat_input("🤖 시뮬레이션을 어떻게 더 수정하고 싶은지 AI에게 설명해주세요")
+            user_input = st.chat_input("시뮬레이션을 어떻게 더 수정하고 싶은지 🤖시뮬레이션 코드 생성 AI에게 설명해주세요")
             
             # 원본으로 돌아가기 버튼
             if 'show_confirm_dialog' not in st.session_state:
@@ -743,7 +743,7 @@ with st.container(border=True):
         
         # 기본 시뮬레이션 실행 중인 경우
         else:
-            user_input = st.chat_input("🤖 아래 시뮬레이션을 어떻게 수정하고 싶은지 AI에게 설명해주세요")
+            user_input = st.chat_input("아래 시뮬레이션을 어떻게 수정하고 싶은지 🤖시뮬레이션 코드 생성 AI에게 설명해주세요")
             
             # 사용자의 답변을 반영한 시뮬레이션 보기 버튼 추가
             button_container = st.empty()

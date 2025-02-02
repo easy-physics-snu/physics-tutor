@@ -123,7 +123,7 @@ st.session_state["pdf_chain"] = rag_chain
 # 사이드바 생성
 with st.sidebar:
 
-    st.text("AI튜터와 대화하기")
+    st.text("AI와 대화하기")
     messages = st.container(height=300)
         
     def print_messages():
@@ -137,7 +137,7 @@ with st.sidebar:
     # 이전 대화 기록 출력
     print_messages()
 
-    if user_input := st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!", key="pdf_chat_input"):
+    if user_input := st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!", key="pdf_chat_input"):
 
         chain = st.session_state["pdf_chain"]
 
@@ -161,7 +161,7 @@ with st.sidebar:
 
 
 st.subheader("오늘 배운 물리 개념은?")
-st.info("- 먼저 [힘과 운동] 소단원에서 배운 내용을 복습해봅시다:) \n - 궁금한게 있으면 왼쪽 사이드바의 🤖AI 튜터에게 물어보세요!")
+st.info("- 먼저 [힘과 운동] 소단원에서 배운 내용을 복습해봅시다:) \n - 궁금한게 있으면 왼쪽 사이드바의 🤓**AI 탐구도우미**에게 물어보세요!")
 
 # AI 튜터의 프롬프트 설정
 TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.  
@@ -176,7 +176,7 @@ TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물
 # 문제와 답변 정의
 QUESTIONS = {
     'Q1_1': {
-        'question': "안녕하세요! 저는 오늘 여러분과 함께 공부할 🧑🏻‍🏫 **AI 튜터**입니다. \n\n먼저 오늘 배운 기본 개념부터 다시 떠올려볼까요? \n\n공을 발로 찰 때처럼 한 사람이 힘을 작용하기도 하지만 줄다리기처럼 여러 사람이 함께 힘을 작용할 때도 있죠. **이처럼 한 물체에 여러 힘이 동시에 작용할 때, 이 힘들과 같은 효과를 나타내는 하나의 힘을 무엇이라고 할까요?** (초성 힌트: ㅇㅉㅎ)",
+        'question': "안녕하세요! 저는 오늘 여러분과 함께 공부할 🧑🏻‍🏫**AI 튜터**입니다. \n\n먼저 오늘 배운 기본 개념부터 다시 떠올려볼까요? \n\n공을 발로 찰 때처럼 한 사람이 힘을 작용하기도 하지만 줄다리기처럼 여러 사람이 함께 힘을 작용할 때도 있죠. **이처럼 한 물체에 여러 힘이 동시에 작용할 때, 이 힘들과 같은 효과를 나타내는 하나의 힘을 무엇이라고 할까요?** (초성 힌트: ㅇㅉㅎ)",
         'answer': '알짜힘',
         'correct_feedback': "정확합니다!  알짜힘은 물체에 작용하는 모든 힘들을 하나로 합친 것이에요. 예를 들어, 줄다리기에서 양쪽에서 당기는 힘들을 모두 고려한 최종적인 힘이 바로 알짜힘이죠. \n\n이제 알짜힘의 다른 이름에 대해 알아볼까요?",
         'hint': "여러 힘을 모두 합쳐서 실제로 영향을 주는 진짜 힘이라는 의미를 가지고 있답니다."
@@ -446,7 +446,7 @@ if is_end:
         st.session_state.balloons_done = True
 
 # End 상태일 때는 입력창을 비활성화
-placeholder = "🧑🏻‍🏫 AI 튜터의 질문에 대한 답변을 작성해주세요." if not is_end else "복습이 완료되었습니다."
+placeholder = "🧑🏻‍🏫AI 튜터의 질문에 대한 답변을 작성해주세요." if not is_end else "복습이 완료되었습니다."
 if user_input := st.chat_input(placeholder, key="qa_chat_input", disabled=is_end):
     process_answer(user_input)
 

@@ -51,7 +51,7 @@ if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
 st.title("생각하기 🤔")
-st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤖AI 튜터에게 물어보세요!")
+st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤓**AI 탐구도우미**에게 물어보세요!")
 # 처음 1번만 실행하기 위한 코드
 if "messages_predict" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
@@ -261,7 +261,7 @@ with st.sidebar:
     - 예: "그럼 지금까지 생각하신 내용을 정리해보시면 좋겠습니다. 우주선이 원 궤도를 따라 움직이려면 힘이 어떤 방향으로 작용해야 한다고 생각하시나요? 왜 그렇게 생각하셨는지도 같이 말씀해 주시겠어요?"""
 
 
-    st.text("AI튜터와 대화하기")
+    st.text("AI와 대화하기")
     messages = st.container(height=400)
 
 
@@ -293,7 +293,7 @@ with st.sidebar:
     kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
 
     # 사용자의 입력
-    user_input = st.chat_input("🤖 AI튜터에게 궁금한 내용을 물어보세요!")
+    user_input = st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!")
 
 
     if kw_button_1:

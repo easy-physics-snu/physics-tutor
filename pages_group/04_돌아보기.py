@@ -456,7 +456,8 @@ with st.sidebar:
         multimodal = st.session_state["multimodal_chain"]
 
         if len(st.session_state["messages_explanation"]) == 0:
-            init_user_input = f"이 그림은 '어떤 물체가 등속 원운동을 하기 위해서 물체에 어떤 방향으로 힘이 작용해야하는가'문제에 대해서 내가 생각한 힘의 방향을 그린 그림이야. 그리고 이렇게 그린 이유는 다음과 같아: {st.session_state["explanation_user_reason"]}."
+            user_reason = st.session_state["explanation_user_reason"]
+            init_user_input = f"이 그림은 '어떤 물체가 등속 원운동을 하기 위해서 물체에 어떤 방향으로 힘이 작용해야하는가'문제에 대해서 내가 생각한 힘의 방향을 그린 그림이야. 그리고 이렇게 그린 이유는 다음과 같아: {user_reason}."
             # 답변 요청
             response = multimodal.stream(
                 user_prompt=init_user_input,

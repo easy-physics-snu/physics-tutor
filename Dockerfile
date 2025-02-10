@@ -14,12 +14,10 @@ RUN apt-get update && apt-get install -y \
 
 # 4-1. 현재 디렉토리의 requirements.txt 파일을 컨테이너의 /app으로 복사
 COPY requirements.txt /app/
+RUN pip3 install --upgrade pip
 
 # 4-2. requirements.txt에 명시된 패키지 설치
 RUN pip3 install -r requirements.txt
-
-# 4-2. requirements.txt에 명시된 패키지 설치
-RUN pip3 install --upgrade pip
 
 # 4-3. FAISS vector-DB 설치
 RUN pip3 install faiss-cpu --force-reinstall

@@ -16,5 +16,5 @@ pip install -r requirements.txt
 
 ### 4. streamlit 실행
 ```
-streamlit run 도입.py
+streamlit run app.py
 ```

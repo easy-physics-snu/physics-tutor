@@ -194,7 +194,7 @@ if submit_button:
     # 기본 제출 처리
     saved_image_path = save_draw_image(canvas_result.image_data)
     st.session_state["predict_user_reason"] = reason
-    st.session_state["saved_image_path"] = saved_image_path
+    st.session_state["predict_saved_image_path"] = saved_image_path
     st.session_state["submission_triggered"] = True  # 제출이 트리거되었음을 표시
     st.success("좌측 사이드바의 **🤓AI 탐구도우미**의 피드백을 확인해주세요!")
     st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)")
@@ -267,7 +267,7 @@ with st.sidebar:
     user_input = st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!")
 
     ## 사용자 답변 제출에 대한 추가 로직(캔버스 사용 시)
-    if st.session_state.get("submission_triggered", True) and "saved_image_path" in st.session_state:
+    if st.session_state.get("submission_triggered", True) and "predict_saved_image_path" in st.session_state:
         # 비동기 처리를 위한 상태 설정
         st.session_state["submission_in_progress"] = True
         
@@ -282,7 +282,7 @@ with st.sidebar:
             
             try:
                 # 이미지 파일을 bytesio로 변환후 path 반환 처리
-                image_filepath = process_png_to_bytesio(st.session_state["saved_image_path"])                # 이미지 파일을 처리
+                image_filepath = process_png_to_bytesio(st.session_state["predict_saved_image_path"])                # 이미지 파일을 처리
                 # AI 답변과 함께 제출 처리
                 # 비동기 요청
                 response = loop.run_until_complete(

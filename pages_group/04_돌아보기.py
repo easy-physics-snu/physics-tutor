@@ -17,10 +17,10 @@ from modules.utils import process_png_to_bytesio
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
-os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
-os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
-os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
-os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
+# os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
+# os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
+# os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
+# os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 st.session_state["init_user_input"] = False
 
@@ -319,7 +319,7 @@ with tab1:
         st.session_state["explanation_saved_image_path"] = saved_image_path
         st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
         st.success("제출 완료! 상단의 '문제 정답' 탭에서 답을 확인해보세요:)")
-        st.image("src/images/find_answer_guide.png", caption="'문제 정답' 탭 위치")
+        st.image("src/images/find_answer_guide.png", caption="'문제 정답' 탭 위치", width=500)
 
 
 with tab2:

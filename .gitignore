@@ -14,4 +14,4 @@ __pycache__
 *.gif
 *.bmp
 
-/draw_images/*.png
+src/draw_images/*.png

@@ -5,16 +5,9 @@ import pandas as pd
 
 from openai import OpenAI
 
-from langchain_community.document_loaders import PDFPlumberLoader
-from langchain_community.vectorstores import FAISS
 from langchain_core.messages.chat import ChatMessage
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from modules.retrieval import embed_file, create_chain
 from langchain_teddynote import logging
-from langchain_teddynote.prompts import load_prompt
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 # os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -56,84 +49,20 @@ if "intro_1_tutor_messages" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
     st.session_state["intro_1_tutor_messages"] = []
 
-if "pdf_chain" not in st.session_state:
-    # 아무런 파일을 업로드 하지 않을 경우
-    st.session_state["pdf_chain"] = None
-
-if "pdf_retriever" not in st.session_state:
-    st.session_state["pdf_retriever"] = None
-
 if "balloons_done" not in st.session_state:
     st.session_state["balloons_done"] = False
 
-@st.cache_resource(show_spinner="업로드한 파일을 처리 중입니다...")
-def embed_file(file_path):
-    # Get filename without extension for the vectorstore
-    file_base_name = os.path.splitext(os.path.basename(file_path))[0]
-    vectorstore_path = f"./.cache/embeddings/{file_base_name}"
-    
-    # Check if we already have embeddings for this file
-    if os.path.exists(vectorstore_path):
-        # Load existing vectorstore
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=st.secrets["openai_api_key"]) #st.session_state.api_key)
-        vectorstore = FAISS.load_local(
-            vectorstore_path,
-            embeddings,
-            allow_dangerous_deserialization=True,
-        )
-        return vectorstore.as_retriever()
-
-    # ... existing document loading and splitting code ...
-    # 단계 1: 문서 로드(Load Documents)
-    loader = PDFPlumberLoader(file_path)
-    docs = loader.load()
-
-    # 단계 2: 문서 분할(Split Documents)
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    split_documents = text_splitter.split_documents(docs)
-
-    # 단계 3: 임베딩(Embedding) 생성
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=st.secrets["openai_api_key"]) # st.session_state.api_key)
-
-    # 단계 4: DB 생성(Create DB) 및 저장
-    # 벡터스토어를 생성합니다.
-    vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
-    # Save the vectorstore
-    vectorstore.save_local(vectorstore_path)
-    
-    return vectorstore.as_retriever()
-
-
-# 체인 생성
-def create_chain(retriever, prompt_path="prompts/doc-rag.yaml", model_name="gpt-4o"):
-    # 단계 6: 프롬프트 생성(Create Prompt)
-    # 프롬프트를 생성합니다.
-    prompt = load_prompt(prompt_path, encoding="utf-8")
-
-    # 단계 7: 언어모델(LLM) 생성
-    # 모델(LLM) 을 생성합니다.
-    llm = ChatOpenAI(model_name=model_name, temperature=0, openai_api_key = st.session_state.api_key)
-    
-    # 단계 8: 체인(Chain) 생성
-    chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-    return chain
 
 # 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
-retriever = embed_file(TEXTBOOK_FILE_PATH)
-selected_model = RAG_OPENAI_MODEL
-selected_prompt = RAG_SYSTEM_PROMPT
+if "pdf_retriever" not in st.session_state:
+    retriever = embed_file(TEXTBOOK_FILE_PATH)
+    st.session_state["pdf_retriever"] = retriever
 
-rag_chain = create_chain(
-    retriever, prompt_path=selected_prompt, model_name=selected_model
-)
-st.session_state["pdf_retriever"] = retriever
-st.session_state["pdf_chain"] = rag_chain
-
+if "pdf_chain" not in st.session_state and st.session_state["pdf_retriever"]:
+    retriever = st.session_state["pdf_retriever"]
+    st.session_state["pdf_chain"] = create_chain(
+        retriever, prompt_path=RAG_SYSTEM_PROMPT, model_name=RAG_OPENAI_MODEL
+    )
 
 ######################################
 ########### Mainpage Logic ###########
@@ -141,7 +70,7 @@ st.session_state["pdf_chain"] = rag_chain
 st.title("들어가기 🚀")
 
 st.subheader("오늘 배운 물리 개념은?")
-st.info("- 먼저 **[1. 여러 가지 운동]** 과 **[2. 힘과 운동]** 소단원에서 배운 내용을 복습해봅시다:) \n - 아래 2개 탭을 모두 마치고 다음 단계로 넘어가주세요!")
+st.info("- 먼저 **[1. 여러 가지 운동]** 과 **[2. 힘과 운동]** 소단원에서 배운 내용을 복습해봅시다:) \n - 궁금한게 있으면 왼쪽 사이드바의 **교과서 찾기**를 활용해보세요. \n - 아래 2개 탭을 모두 마치고 다음 단계로 넘어가주세요!")
 
 st.image("src/images/find_tab_guide.png", width=500)
 
@@ -156,22 +85,23 @@ if tab2:
 ########### TAB 1 ###########
 with tab1:
     st.write("**Q1. 놀이공원에서 볼 수 있는 여러 가지 놀이 기구들의 운동 방향과 속력 변화를 표에 정리해봅시다.**")
-    st.write("(셀을 더블클릭한 후 알맞은 설명을 골라주세요)")
+    st.write("([운동 방향]과 [속력] 셀을 더블클릭한 후 알맞은 설명을 골라주세요)")
     df = pd.DataFrame(
-        [
-            {"type": f"https://dimg.donga.com/ugc/CDB/SODA/Article/57/e0/f9/a4/57e0f9a4248cd2738de6.gif", "direction": None, "speed": None},
-            {"type": f"https://mblogthumb-phinf.pstatic.net/MjAyNDAxMTJfMjM3/MDAxNzA1MDQxNTI4NTI5.H9ncgGIDHPaCqa0i3Mz-2s8NU-qvEye8YQwlSQaFWZUg.wDDf8kJoDCbWyuVEBEqkzxfxQCv5GnNAMYw0Bo4nZnIg.GIF.onnamong/743084218.gif?type=w800", "direction": None, "speed": None},
-            {"type": f"https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMDM2ZTRueWxqMW00emRyanIxaGVwdGx4amR2aW5scDNnYnMzbTg4YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WqSCrUOEWQpWC8JGNg/giphy.webp", "direction": None, "speed": None},
-            {"type": f"https://mblogthumb-phinf.pstatic.net/MjAyMjEyMjhfMTMx/MDAxNjcyMTYzMDc2Mzc3.RACWbUSQ5ys66npAKl1ABuFkloP9bs3D3Hg6Hv0rhG0g.z4ZBQI_SRDXNCaO8v51EZrYxIkCwLcnawqYXJjqunrsg.GIF.mok5022/3546279707.gif?type=w800", "direction": None, "speed": None},
-        ]
+        {
+            "Type" : ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
+            "Image": ["https://dimg.donga.com/ugc/CDB/SODA/Article/57/e0/f9/a4/57e0f9a4248cd2738de6.gif", "https://mblogthumb-phinf.pstatic.net/MjAyNDAxMTJfMjM3/MDAxNzA1MDQxNTI4NTI5.H9ncgGIDHPaCqa0i3Mz-2s8NU-qvEye8YQwlSQaFWZUg.wDDf8kJoDCbWyuVEBEqkzxfxQCv5GnNAMYw0Bo4nZnIg.GIF.onnamong/743084218.gif?type=w800", "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMDM2ZTRueWxqMW00emRyanIxaGVwdGx4amR2aW5scDNnYnMzbTg4YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WqSCrUOEWQpWC8JGNg/giphy.webp", "https://mblogthumb-phinf.pstatic.net/MjAyMjEyMjhfMTMx/MDAxNjcyMTYzMDc2Mzc3.RACWbUSQ5ys66npAKl1ABuFkloP9bs3D3Hg6Hv0rhG0g.z4ZBQI_SRDXNCaO8v51EZrYxIkCwLcnawqYXJjqunrsg.GIF.mok5022/3546279707.gif?type=w800"],
+            "Direction": [None, None, None, None],
+            "Speed": [None, None, None, None]
+        }
     )
 
     column_configuration = {
-        "type": st.column_config.ImageColumn("놀이 기구 (더블클릭해서 확대해보세요)"),
-        "direction": st.column_config.SelectboxColumn(
+        "Type": st.column_config.TextColumn("놀이 기구", disabled=True),
+        "Image": st.column_config.ImageColumn("이미지 (더블클릭해서 확대해보세요)"),
+        "Direction": st.column_config.SelectboxColumn(
             "운동 방향", options=["변한다", "일정하다"]
         ),
-        "speed": st.column_config.SelectboxColumn(
+        "Speed": st.column_config.SelectboxColumn(
             "속력", options=["변한다", "일정하다"]
         ),
     }
@@ -187,14 +117,14 @@ with tab1:
     st.session_state.q1 = False
     info_q1 = st.empty()
     if edited_df.notnull().all().all():
-        if edited_df.iloc[0, 1] == "일정하다":
-            if edited_df.iloc[0, 2] == "변한다":         
-                if edited_df.iloc[1, 1] == "변한다":
-                    if edited_df.iloc[1, 2] == "일정하다":
-                        if edited_df.iloc[2, 1] == "변한다":
-                            if edited_df.iloc[2, 2] == "변한다":
-                                if edited_df.iloc[3, 1] == "변한다":
-                                    if edited_df.iloc[3, 2] == "변한다":
+        if edited_df.iloc[0, 2] == "일정하다":
+            if edited_df.iloc[0, 3] == "변한다":         
+                if edited_df.iloc[1, 2] == "변한다":
+                    if edited_df.iloc[1, 3] == "일정하다":
+                        if edited_df.iloc[2, 2] == "변한다":
+                            if edited_df.iloc[2, 3] == "변한다":
+                                if edited_df.iloc[3, 2] == "변한다":
+                                    if edited_df.iloc[3, 3] == "변한다":
                                         st.session_state.q1 = True
                                         info_q1.success("정답입니다!")
                                         if not st.session_state.balloons_t1_q1:
@@ -212,22 +142,22 @@ with tab1:
     st.write("(각 놀이 기구는 중복없이 한가지에만 포함됩니다)")
     options_1 = st.multiselect(
         "속력만 변하는 운동",
-        ["자이로드롭", "관람차", "롤러코스터", "바이킹"],
+        ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
     )
     options_2 = st.multiselect(
         "운동 방향만 변하는 운동",
-        ["자이로드롭", "관람차", "롤러코스터", "바이킹"],
+        ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
     )
     options_3 = st.multiselect(
         "속력과 운동 방향이 모두 변하는 운동",
-        ["자이로드롭", "관람차", "롤러코스터", "바이킹"],
+        ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
     )
 
     st.session_state.q2 = False
     info_q2 = st.empty()
     if options_1 and options_2 and options_3:
         if options_1 == ["자이로드롭"]:
-            if options_2 == ["관람차"]:
+            if options_2 == ["대관람차"]:
                 if options_3 == ["롤러코스터", "바이킹"] or options_3 == ["바이킹", "롤러코스터"]:
                     st.session_state.q2 = True
                     info_q2.success("정답입니다!")

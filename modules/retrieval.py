@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 
-from langchain_core.messages.chat import ChatMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -10,7 +9,6 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from langchain_teddynote.prompts import load_prompt
-from langchain_teddynote import logging
 
 # API KEY 정보로드
 # config = settings.load_config()
@@ -50,57 +48,25 @@ def init_setting():
         st.session_state["pdf_retriever"] = None
 
 
-
-# 사이드바 생성
-with st.sidebar:
-    # 초기화 버튼 생성
-    clear_btn = st.button("대화 초기화")
-
-    # 파일 업로드
-    uploaded_file = st.file_uploader("파일 업로드", type=["pdf"])
-
-    # # 모델 선택 메뉴
-    # selected_model = st.selectbox(
-    #     "LLM 선택", ["gpt-4o", "gpt-4-turbo", "gpt-4o-mini"], index=0
-    # )
-
-    # selected_prompt = st.selectbox(
-    #     "프롬프트 선택",
-    #     ["prompts/doc-rag.yaml", "prompts/doc-quiz.yaml", "prompts/doc-summary.yaml"],
-    #     index=0,
-    # )
-
-    # update_btn = st.button("설정 업데이트")
-
-
-# 모델 선택 메뉴
-# st.selectbox(
-#     "프롬프트 선택",
-#     ["prompts/doc-rag.yaml", "prompts/doc-quiz.yaml", "prompts/doc-summary.yaml"],
-#     index=0,
-# )
-
-
-# 이전 대화를 출력
-def print_messages():
-    for chat_message in st.session_state["messages"]:
-        st.chat_message(chat_message.role).write(chat_message.content)
-
-
-# 새로운 메시지를 추가
-def add_message(role, message):
-    st.session_state["messages"].append(ChatMessage(role=role, content=message))
-
-
 # 파일을 캐시 저장(시간이 오래 걸리는 작업을 처리할 예정)
 @st.cache_resource(show_spinner="업로드한 파일을 처리 중입니다...")
-def embed_file(file):
-    # 업로드한 파일을 캐시 디렉토리에 저장합니다.
-    file_content = file.read()
-    file_path = f"./.cache/files/{file.name}"
-    with open(file_path, "wb") as f:
-        f.write(file_content)
+def embed_file(file_path):
+    # Get filename without extension for the vectorstore
+    file_base_name = os.path.splitext(os.path.basename(file_path))[0]
+    vectorstore_path = f"./.cache/embeddings/{file_base_name}"
 
+    # Check if we already have embeddings for this file
+    if os.path.exists(vectorstore_path):
+        # Load existing vectorstore
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small", openai_api_key=st.secrets["openai_api_key"]) #st.session_state.api_key)
+        vectorstore = FAISS.load_local(
+            vectorstore_path,
+            embeddings,
+            allow_dangerous_deserialization=True,
+        )
+        return vectorstore.as_retriever()
+
+    # ... existing document loading and splitting code ...
     # 단계 1: 문서 로드(Load Documents)
     loader = PDFPlumberLoader(file_path)
     docs = loader.load()
@@ -123,7 +89,7 @@ def embed_file(file):
 
 
 # 체인 생성
-def create_chain(retriever, prompt_path="prompts/pdf-rag.yaml", model_name="gpt-4o"):
+def create_chain(retriever, prompt_path, model_name):
     # 단계 6: 프롬프트 생성(Create Prompt)
     # 프롬프트를 생성합니다.
     prompt = load_prompt(prompt_path, encoding="utf-8")
@@ -140,70 +106,3 @@ def create_chain(retriever, prompt_path="prompts/pdf-rag.yaml", model_name="gpt-
         | StrOutputParser()
     )
     return chain
-
-
-col1, col2 = st.columns(2)
-placeholder1 = col1.empty()
-placeholder2 = col2.empty()
-
-
-# if update_btn:
-#     if st.session_state["pdf_retriever"] is not None:
-#         retriever = st.session_state["pdf_retriever"]
-#         chain = create_chain(
-#             retriever, prompt_path=selected_prompt, model_name=selected_model
-#         )
-#         st.session_state["pdf_chain"] = chain
-#     else:
-#         retriever = embed_file(uploaded_file)
-#         chain = create_chain(
-#             retriever, prompt_path=selected_prompt, model_name=selected_model
-#         )
-#         st.session_state["pdf_retriever"] = retriever
-#         st.session_state["pdf_chain"] = chain
-
-# 이전 대화 기록 출력
-# print_messages()
-
-
-def init_pdf_chat(selected_prompt, selected_model):
-    if uploaded_file:
-        # 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
-        retriever = embed_file(uploaded_file)
-        chain = create_chain(
-            retriever, prompt_path=selected_prompt, model_name=selected_model
-        )
-        st.session_state["pdf_retriever"] = retriever
-        st.session_state["pdf_chain"] = chain
-
-
-# 사용자의 입력
-user_input = st.chat_input("궁금한 내용을 물어보세요!")
-
-# 경고 메시지를 띄우기 위한 빈 영역
-warning_msg = st.empty()
-
-if user_input:
-    chain = st.session_state["pdf_chain"]
-
-    if chain is not None:
-        # 사용자의 입력
-        st.chat_message("user").write(user_input)
-        # 스트리밍 호출
-        response = chain.stream(user_input)
-        with st.chat_message("assistant"):
-            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-            container = st.empty()
-
-            ai_answer = ""
-            for token in response:
-                ai_answer += token
-                container.markdown(ai_answer)
-
-        # 대화기록을 저장한다.
-        add_message("user", user_input)
-        add_message("assistant", ai_answer)
-
-else:
-    # 파일을 업로드 하라는 경고 메시지 출력
-    warning_msg.error("파일을 업로드 해주세요.")

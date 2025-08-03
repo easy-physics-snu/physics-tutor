@@ -4,20 +4,17 @@ import streamlit as st
 import time
 
 from typing import List
+from pydantic import BaseModel, Field
 from langchain_core.messages.chat import ChatMessage
+from langchain_core.messages import BaseMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_openai import ChatOpenAI #, OpenAIEmbeddings
-# from langchain_ollama import ChatOllama
-
-from pydantic import BaseModel, Field
-from langchain_core.messages import BaseMessage
 
 from langchain_teddynote import logging
-
+from modules.retrieval import embed_file, create_chain
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -30,6 +27,13 @@ if "messages_application" not in st.session_state:
 if "messages_application_tutor" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
     st.session_state["messages_application_tutor"] = []
+
+
+TEXTBOOK_FILE_PATH = "src/textbooks/physics_textbook.pdf"
+
+TUTOR_OPENAI_MODEL = "gpt-4o"
+RAG_OPENAI_MODEL = "gpt-4o"
+RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
 
 # os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 # os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
@@ -79,8 +83,56 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
     return store[session_ids]  # 해당 세션 ID에 대한 세션 기록 반환
 
 
+# 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
+if "pdf_retriever" not in st.session_state:
+    retriever = embed_file(TEXTBOOK_FILE_PATH)
+    st.session_state["pdf_retriever"] = retriever
+if "pdf_chain" not in st.session_state:
+    rag_chain = create_chain(
+        retriever, prompt_path=RAG_SYSTEM_PROMPT, model_name=RAG_OPENAI_MODEL
+    )
+    st.session_state["pdf_chain"] = rag_chain
+
+
+######################################
+########### Mainpage Logic ###########
+######################################
 st.title("적용하기 💡")
 st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 🧑🏻‍🏫**AI 튜터**와 대화하면서 개념을 새로운 상황에 적용하고 내 이해를 정교화해보세요.")
+
+# 진행률 초기화
+if "current_score" not in st.session_state:
+    st.session_state["current_score"] = 0.0
+
+# 점수 업데이트 플래그 초기화
+if "score_updated" not in st.session_state:
+    st.session_state["score_updated"] = False
+
+@st.fragment
+def update_progress(progress_percentage):
+    st.progress(progress_percentage, text=f"내점수: {st.session_state['current_score']:.0f}점 ({st.session_state['current_score']:.0f}/100)")
+
+
+# Progress bar를 우측 상단에 고정
+with st.sidebar:
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] {
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: auto;
+            width: auto;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown("💯 적용하기 점수")
+    progress_percentage = st.session_state["current_score"] / 100.0
+    update_progress(progress_percentage)    
+
 
 st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
 
@@ -292,6 +344,9 @@ with feedback_container:
             try:
                 # 80% 이상 달성 시 축하 효과와 마무리 메시지
                 if st.session_state["score"] >= 80:
+                    # 최종 점수를 100점으로 설정
+                    st.session_state["current_score"] = 100.0
+                    
                     st.balloons()
                     with st.chat_message("assistant"):
                         st.write(" 축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.")
@@ -333,136 +388,206 @@ with feedback_container:
                         streamed_text += part + " "  # Add the next word/character
                         placeholder.markdown(streamed_text)  # Update the placeholder content
                         time.sleep(0.1)
-                
-                # AI 답변도 대화기록에 저장
-                add_message("assistant", response.content)
 
-# 사이드바 생성
+                # AI 답변도 대화기록에 저장
+                add_message("assistant", response.content)       
+
+                # AI 답변에서 점수 추출하여 진행률 업데이트
+                try:
+                    # "현재 답변 점수는 약 X.X 입니다" 패턴에서 점수 추출
+                    score_match = re.search(r'현재 답변 점수는 약 (\d+\.?\d*) 입니다', response.content)
+                    if score_match:
+                        extracted_score = float(score_match.group(1))
+                        st.session_state["current_score"] = extracted_score
+                        # 점수 업데이트를 위한 플래그 설정
+                        st.session_state["score_updated"] = True
+                        st.rerun()
+                except (ValueError, TypeError) as e:
+                    st.error(f"점수 추출 중 오류가 발생했습니다: {e}")
+
+
+#####################################
+########### Sibebar Logic ###########
+#####################################
 with st.sidebar:
 
-    st.text("AI와 대화하기")
-    messages = st.container(height=400)
-    ai_info = st.empty()
+    st.write("⏬ 혼자서 문제 풀기 너무 어렵다면? ⏬")
+    
+    # toggle_ai_helper 초기화 - session_state에 없을 때만 False로 설정
+    if "toggle_ai_helper" not in st.session_state:
+        st.session_state["toggle_ai_helper"] = False
 
-    # 모델 선택 메뉴
-    selected_model = "gpt-4o" # st.selectbox("LLM 선택", ["gpt-4o", "gpt-4o-mini"], index=0)
+    toggle_ai_helper = st.toggle("**교과서 찾기** 사용하기", value=st.session_state["toggle_ai_helper"])
 
-    # 사이드바 시스템 체인 생성
-    def generate_chain(model_name=selected_model):
-        # 현재 선택된 operation 값 가져오기
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", 
-            """당신은 친절하고 대화형 학습을 돕는 **물리 튜터**입니다.  
-        **목표:** 학생이 '등속 원운동'에서 힘의 방향이 물체의 운동 궤적에 어떻게 작용하는지를 이해하도록 돕는 것입니다. 정답 화면을 제공한 후, 학생이 정답을 논리적으로 이해하고 설명할 수 있도록 대화형 질문과 설명을 진행하세요.  
-        **중요:**  
-        1. 정답을 단순히 제시하는 데 그치지 말고, 학생이 그 이유를 이해하고 자신의 언어로 정리할 수 있도록 돕습니다.  
-        2. 학생의 관점과 질문을 존중하며, 친근한 존댓말로 대화하세요.  
-        3. 각 응답은 간결하고 명확하게 작성하세요(2문단 이내).  
-        4. 학생이 이해하지 못한 부분이 있을 경우, 추가적인 설명과 예시를 활용해 개념을 명확히 전달하세요.
+    if toggle_ai_helper:
+        st.session_state["toggle_ai_helper"] = True
 
-        **프롬프트 시작 제안:**  
-        (정답 화면을 학생에게 보여준 후 대화를 시작한다고 생각하세요.)
-        1. **정답 화면 제시 후**  
-        - "이 화면에서 물체가 등속 원운동을 유지하기 위해 힘이 어떤 방향으로 작용하고 있는지 보여주고 있어요. 여기서 힘의 방향이 원의 중심을 향하는 것을 확인할 수 있습니다."  
-        2. **첫 질문:**  
-        - "이 화면에서 힘이 왜 원의 중심을 향해야 하는지 생각해 보셨나요? 지금까지의 관찰과 그림을 바탕으로 한 번 설명해 보세요."  
+        st.warning("단, 스스로 충분히 고민해도 정말 모르겠을 때 사용하기!")
 
-        **대화 전략:**  
-        1. 학생의 답변을 기반으로 질문을 이어가며 올바른 개념을 도출하도록 돕습니다.  
-        2. 대화의 초점은 학생이 '등속 원운동에서 속도의 방향이 계속 바뀌기 때문에 중심 방향의 힘(구심력)이 필요하다'는 점을 논리적으로 이해하는 데 맞춰야 합니다.  
-        3. 정답 화면을 참고하며 학생의 추론 과정을 구체화하도록 질문을 활용하세요.
+        st.text("교과서와 '대화'해봅시다")
+        messages = st.container(height=300)
+            
+        def print_messages():
+            for chat_message in st.session_state["messages_application_tutor"]:
+                messages.chat_message(chat_message.role).write(chat_message.content)
 
-        **핵심 질문 유도:**  
-        - "등속 원운동에서는 물체의 속력이 일정하지만, 속도의 방향은 계속 변합니다. 속도의 방향을 바꾸기 위해 힘이 어떤 역할을 한다고 생각하나요?"  
-        - "이 정답 화면에서 보이는 힘의 방향이 속도와 직각을 이루는 이유는 무엇일까요?"  
-        - "만약 힘이 중심을 향하지 않는다면, 물체의 운동 궤적은 어떻게 될까요?"  
+        # 새로운 메시지를 추가
+        def add_message(role, message):
+            st.session_state["messages_application_tutor"].append(ChatMessage(role=role, content=message))
 
-        **추가적인 설명 제공:**  
-        학생이 답을 이해하지 못하거나 잘못된 추론을 제시했을 경우, 올바른 개념을 설명하세요.  
-        - "등속 원운동은 물체가 일정한 속력으로 원 궤도를 따라 움직이는 운동이에요. 하지만 속도의 방향이 계속 바뀌기 때문에 가속도가 존재하게 됩니다. 이 가속도를 만들어내기 위해서는 항상 원의 중심 방향으로 힘이 작용해야 해요. 이를 구심력이라고 합니다."  
-        - "만약 힘이 중심 방향으로 작용하지 않는다면, 물체는 직선으로 운동을 계속하려는 경향(관성)에 의해 원 궤도를 벗어나게 됩니다."  
+        # 이전 대화 기록 출력
+        print_messages()
 
-        **대화 마무리:**  
-        학생이 자신의 언어로 개념을 정리할 수 있도록 유도하세요.  
-        - "지금까지 배운 내용을 바탕으로 정리해 볼까요? 물체가 등속 원운동을 유지하기 위해 힘의 방향이 왜 원의 중심을 향해야 하는지 설명해 주세요."  
-        - "정답 화면을 다시 보면서 힘의 방향과 운동 궤적의 관계를 한 번 더 정리해 보세요. 왜 등속 원운동에서 중심 방향의 힘이 필요한지, 그것이 어떻게 운동을 유지하는지 설명할 수 있나요?"  
+        if user_input := st.chat_input("궁금한 내용을 물어보세요!", key="pdf_chat_input"):
 
-        **중요 사항:**  
-        - 학생이 스스로 설명하려고 할 때 격려하며, 잘못된 표현이 있어도 바로 정정하지 말고 추가 질문으로 사고를 확장하도록 유도하세요.  
-        - 정답 화면과 학생의 추론 과정을 연결시키는 데 집중하며, 이해가 완벽해질 때까지 인내심을 가지고 돕습니다."""
-            ),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{input}")
-        ])
+            chain = st.session_state["pdf_chain"]
 
-        # 객체 생성
-        llm = ChatOpenAI(
-            temperature=0,
-            model_name=model_name,
-            openai_api_key = st.session_state.api_key
-        )
+            if chain is not None:
+                # 사용자의 입력
+                messages.chat_message("user").write(user_input)
+                # 스트리밍 호출
+                response = chain.stream(user_input)
+                with messages.chat_message("assistant"):
+                    # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+                    container = st.empty()
+
+                    ai_answer = ""
+                    for token in response:
+                        ai_answer += token
+                        container.markdown(ai_answer)
+
+                # 대화기록을 저장한다.
+                add_message("user", user_input)
+                add_message("assistant", ai_answer)
 
 
-        chain = prompt | llm
-        chain_with_history = RunnableWithMessageHistory(
-            chain,
-            get_by_session_id,
-            input_messages_key="input",
-            history_messages_key="history",
-        )
 
-        return chain_with_history
+# # 사이드바 생성
+# with st.sidebar:
+
+#     st.text("AI와 대화하기")
+#     messages = st.container(height=400)
+#     ai_info = st.empty()
+
+#     # 모델 선택 메뉴
+#     selected_model = "gpt-4o" # st.selectbox("LLM 선택", ["gpt-4o", "gpt-4o-mini"], index=0)
+
+#     # 사이드바 시스템 체인 생성
+#     def generate_chain(model_name=selected_model):
+#         # 현재 선택된 operation 값 가져오기
+#         prompt = ChatPromptTemplate.from_messages([
+#             ("system", 
+#             """당신은 친절하고 대화형 학습을 돕는 **물리 튜터**입니다.  
+#         **목표:** 학생이 '등속 원운동'에서 힘의 방향이 물체의 운동 궤적에 어떻게 작용하는지를 이해하도록 돕는 것입니다. 정답 화면을 제공한 후, 학생이 정답을 논리적으로 이해하고 설명할 수 있도록 대화형 질문과 설명을 진행하세요.  
+#         **중요:**  
+#         1. 정답을 단순히 제시하는 데 그치지 말고, 학생이 그 이유를 이해하고 자신의 언어로 정리할 수 있도록 돕습니다.  
+#         2. 학생의 관점과 질문을 존중하며, 친근한 존댓말로 대화하세요.  
+#         3. 각 응답은 간결하고 명확하게 작성하세요(2문단 이내).  
+#         4. 학생이 이해하지 못한 부분이 있을 경우, 추가적인 설명과 예시를 활용해 개념을 명확히 전달하세요.
+
+#         **프롬프트 시작 제안:**  
+#         (정답 화면을 학생에게 보여준 후 대화를 시작한다고 생각하세요.)
+#         1. **정답 화면 제시 후**  
+#         - "이 화면에서 물체가 등속 원운동을 유지하기 위해 힘이 어떤 방향으로 작용하고 있는지 보여주고 있어요. 여기서 힘의 방향이 원의 중심을 향하는 것을 확인할 수 있습니다."  
+#         2. **첫 질문:**  
+#         - "이 화면에서 힘이 왜 원의 중심을 향해야 하는지 생각해 보셨나요? 지금까지의 관찰과 그림을 바탕으로 한 번 설명해 보세요."  
+
+#         **대화 전략:**  
+#         1. 학생의 답변을 기반으로 질문을 이어가며 올바른 개념을 도출하도록 돕습니다.  
+#         2. 대화의 초점은 학생이 '등속 원운동에서 속도의 방향이 계속 바뀌기 때문에 중심 방향의 힘(구심력)이 필요하다'는 점을 논리적으로 이해하는 데 맞춰야 합니다.  
+#         3. 정답 화면을 참고하며 학생의 추론 과정을 구체화하도록 질문을 활용하세요.
+
+#         **핵심 질문 유도:**  
+#         - "등속 원운동에서는 물체의 속력이 일정하지만, 속도의 방향은 계속 변합니다. 속도의 방향을 바꾸기 위해 힘이 어떤 역할을 한다고 생각하나요?"  
+#         - "이 정답 화면에서 보이는 힘의 방향이 속도와 직각을 이루는 이유는 무엇일까요?"  
+#         - "만약 힘이 중심을 향하지 않는다면, 물체의 운동 궤적은 어떻게 될까요?"  
+
+#         **추가적인 설명 제공:**  
+#         학생이 답을 이해하지 못하거나 잘못된 추론을 제시했을 경우, 올바른 개념을 설명하세요.  
+#         - "등속 원운동은 물체가 일정한 속력으로 원 궤도를 따라 움직이는 운동이에요. 하지만 속도의 방향이 계속 바뀌기 때문에 가속도가 존재하게 됩니다. 이 가속도를 만들어내기 위해서는 항상 원의 중심 방향으로 힘이 작용해야 해요. 이를 구심력이라고 합니다."  
+#         - "만약 힘이 중심 방향으로 작용하지 않는다면, 물체는 직선으로 운동을 계속하려는 경향(관성)에 의해 원 궤도를 벗어나게 됩니다."  
+
+#         **대화 마무리:**  
+#         학생이 자신의 언어로 개념을 정리할 수 있도록 유도하세요.  
+#         - "지금까지 배운 내용을 바탕으로 정리해 볼까요? 물체가 등속 원운동을 유지하기 위해 힘의 방향이 왜 원의 중심을 향해야 하는지 설명해 주세요."  
+#         - "정답 화면을 다시 보면서 힘의 방향과 운동 궤적의 관계를 한 번 더 정리해 보세요. 왜 등속 원운동에서 중심 방향의 힘이 필요한지, 그것이 어떻게 운동을 유지하는지 설명할 수 있나요?"  
+
+#         **중요 사항:**  
+#         - 학생이 스스로 설명하려고 할 때 격려하며, 잘못된 표현이 있어도 바로 정정하지 말고 추가 질문으로 사고를 확장하도록 유도하세요.  
+#         - 정답 화면과 학생의 추론 과정을 연결시키는 데 집중하며, 이해가 완벽해질 때까지 인내심을 가지고 돕습니다."""
+#             ),
+#             MessagesPlaceholder(variable_name="history"),
+#             ("human", "{input}")
+#         ])
+
+#         # 객체 생성
+#         llm = ChatOpenAI(
+#             temperature=0,
+#             model_name=model_name,
+#             openai_api_key = st.session_state.api_key
+#         )
 
 
-    # 이전 대화를 출력
-    def print_messages_tutor():
-        for chat_message in st.session_state["messages_application_tutor"]:
-            messages.chat_message(chat_message.role).write(chat_message.content)
+#         chain = prompt | llm
+#         chain_with_history = RunnableWithMessageHistory(
+#             chain,
+#             get_by_session_id,
+#             input_messages_key="input",
+#             history_messages_key="history",
+#         )
+
+#         return chain_with_history
 
 
-    # 새로운 메시지를 추가
-    def add_message_tutor(role, message):
-        st.session_state["messages_application_tutor"].append(ChatMessage(role=role, content=message))
+#     # 이전 대화를 출력
+#     def print_messages_tutor():
+#         for chat_message in st.session_state["messages_application_tutor"]:
+#             messages.chat_message(chat_message.role).write(chat_message.content)
 
 
-    # 이전 대화 기록 출력
-    print_messages_tutor()
+#     # 새로운 메시지를 추가
+#     def add_message_tutor(role, message):
+#         st.session_state["messages_application_tutor"].append(ChatMessage(role=role, content=message))
 
-    # 사용자의 입력
-    user_input_tutor = st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!")
 
-    # if len(st.session_state["messages_application_tutor"]) == 0:
-    #     # Display the question directly
-    #     with messages.chat_message("assistant"):
-    #         st.markdown(applyingQuestion)
+#     # 이전 대화 기록 출력
+#     print_messages_tutor()
+
+#     # 사용자의 입력
+#     user_input_tutor = st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!")
+
+#     # if len(st.session_state["messages_application_tutor"]) == 0:
+#     #     # Display the question directly
+#     #     with messages.chat_message("assistant"):
+#     #         st.markdown(applyingQuestion)
         
-    #     # Add the question to history
-    #     add_message("assistant", applyingQuestion)
+#     #     # Add the question to history
+#     #     add_message("assistant", applyingQuestion)
 
-    if user_input_tutor:
-        # 답변 요청
-        conv_chain = generate_chain(selected_model)
+#     if user_input_tutor:
+#         # 답변 요청
+#         conv_chain = generate_chain(selected_model)
 
-        # 사용자의 입력
-        messages.chat_message("user").write(user_input_tutor)
+#         # 사용자의 입력
+#         messages.chat_message("user").write(user_input_tutor)
 
-        with messages.chat_message("assistant"):
-            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-            container = st.empty()
-            generator = conv_chain.stream(
-                {
-                    "input": user_input_tutor,
-                },
-                config={"configurable": {"session_id": "ab12"}}
-            )
-            ai_answer = ""
-            for token in generator:
-                ai_answer += token.content
-                container.markdown(ai_answer)
+#         with messages.chat_message("assistant"):
+#             # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+#             container = st.empty()
+#             generator = conv_chain.stream(
+#                 {
+#                     "input": user_input_tutor,
+#                 },
+#                 config={"configurable": {"session_id": "ab12"}}
+#             )
+#             ai_answer = ""
+#             for token in generator:
+#                 ai_answer += token.content
+#                 container.markdown(ai_answer)
 
-        # 대화기록을 저장한다.
-        add_message_tutor("user", user_input_tutor)
-        add_message_tutor("assistant", ai_answer)
+#         # 대화기록을 저장한다.
+#         add_message_tutor("user", user_input_tutor)
+#         add_message_tutor("assistant", ai_answer)
 
 
 # Create columns with specific ratios

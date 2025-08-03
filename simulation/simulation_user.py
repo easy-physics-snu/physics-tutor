@@ -36,10 +36,16 @@ def calculate_force(position, velocity):
     물체에 작용하는 힘을 계산하는 이 함수는 유저의 요청에 따라 달라지게 되며, 
     요청시 물체의 현재 위치와 속도를 사용하여 함수를 구성할 수도 있습니다.
     """
-    # 속도의 방향으로 힘 크기 100을 추가
+    # 물체의 현재 위치에서 원의 중심으로부터의 방향 벡터 계산
+    direction = np.array([center_x - position[0], center_y - position[1]])
+    # 방향 벡터의 크기 계산
+    magnitude = np.linalg.norm(direction)
+    # 단위 벡터로 변환
+    if magnitude > 0:
+        direction = direction / magnitude
+    # 힘의 크기를 100으로 설정하고 방향에 따라 힘을 계산 (중심과 반대 방향)
     force_magnitude = 100
-    unit_velocity = velocity / np.linalg.norm(velocity)  # 속도의 단위 벡터
-    return force_magnitude * unit_velocity  # 힘을 반환
+    return -force_magnitude * direction
 
 def init_simulation_state():
     reset_simulation()
@@ -254,7 +260,7 @@ def reset_simulation():
     """
     return {
         'position': [center_x + ORBIT_RADIUS, center_y],
-        'velocity': [0, INITIAL_SPEED],  # 초기 속도를 1로 설정
+        'velocity': [0, INITIAL_SPEED],
         'trajectory_points': [],
         'simulation_running': False,
         'show_velocity_vector': True,

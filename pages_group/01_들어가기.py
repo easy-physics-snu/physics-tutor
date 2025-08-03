@@ -24,10 +24,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
-TEXTBOOK_FILE_PATH = "textbooks/physics_textbook.pdf"
+TEXTBOOK_FILE_PATH = "src/textbooks/physics_textbook.pdf"
 
 TUTOR_OPENAI_MODEL = "gpt-4o"
 RAG_OPENAI_MODEL = "gpt-4o"
+RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
 
 # 캐시 디렉토리 생성
 if not os.path.exists(".cache"):
@@ -104,7 +105,7 @@ def embed_file(file_path):
 
 
 # 체인 생성
-def create_chain(retriever, prompt_path="prompts/doc-rag.yaml", model_name=RAG_OPENAI_MODEL):
+def create_chain(retriever, prompt_path="prompts/doc-rag.yaml", model_name="gpt-4o"):
     # 단계 6: 프롬프트 생성(Create Prompt)
     # 프롬프트를 생성합니다.
     prompt = load_prompt(prompt_path, encoding="utf-8")
@@ -124,8 +125,8 @@ def create_chain(retriever, prompt_path="prompts/doc-rag.yaml", model_name=RAG_O
 
 # 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
 retriever = embed_file(TEXTBOOK_FILE_PATH)
-selected_model = "gpt-4o"
-selected_prompt = "prompts/doc-rag-scaffold.yaml"
+selected_model = RAG_OPENAI_MODEL
+selected_prompt = RAG_SYSTEM_PROMPT
 
 rag_chain = create_chain(
     retriever, prompt_path=selected_prompt, model_name=selected_model

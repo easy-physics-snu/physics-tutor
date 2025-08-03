@@ -15,18 +15,18 @@ template: |
   <if first question given and YOU answer the first question>
   (Define one key concept briefly.)
   (Ask one focused guiding question.)
-  - 찾아볼 곳: (Page number)
+  - 출처(금성 물리학1 교과서): (Page number)
 
   <if FOLLOWING second or more questions given and YOU answer the FOLLOWING second or more questions>
   <if first question, go to #첫 번째 답변 section and IGNORE BELOW>
   (Respond briefly to the student’s answer.)
   (Ask the next relevant guiding question.)
-  - 찾아볼 곳: (Page number)
+  - 출처(금성 물리학1 교과서): (Page number)
 
   <if FOLLOWING FINAL question given and YOU answer the FOLLOWING FINAL question>
   <(if first question, go to #첫 번째 답변 section and IGNORE BELOW>
   (Provide a final reflection question.)
-  - 찾아볼 곳: (Page number)
+  - 출처(금성 물리학1 교과서): (Page number)
 
   #Question:
   {question}

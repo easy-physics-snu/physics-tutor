@@ -324,7 +324,7 @@ with st.sidebar:
 
     # 추천 질문 사용 여부에 따라 조건부 표시
     if st.session_state.get("toggle_recommended_questions", True):
-        st.text("추천질문 (클릭 시 다른 질문이 생성됩니다)")
+        st.text("추천 질문 (클릭 시 다른 질문이 생성됩니다)")
         col1, col2 = st.columns(2)
         placeholder1 = col1.empty()
         placeholder2 = col2.empty()

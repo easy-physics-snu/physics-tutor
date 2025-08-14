@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>원운동 알짜힘 방향 탐구</title>
+  <style>
+    #container {
+      display: flex;
+      align-items: center;
+      margin-top: 40px;
+    }
+    #sidebar {
+      margin-left: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #angleValue {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="myP5Canvas" width="600" height="300" style="border:1px solid #ccc;"></canvas>
+    <div id="sidebar">
+      <label for="angleSlider">힘의 각도 (도):</label>
+      <input type="range" id="angleSlider" min="-180" max="180" value="0">
+      <div id="angleValue">0° </div>
+      <button id="resetBtn">초기화</button>
+      <button id="stepBtn">스텝</button>
+      <button id="runBtn">연속</button>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('myP5Canvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('angleSlider');
+    const angleValue = document.getElementById('angleValue');
+    const resetBtn = document.getElementById('resetBtn');
+    const stepBtn = document.getElementById('stepBtn');
+    const runBtn = document.getElementById('runBtn');
+    let runInterval = null;
+
+    // 시뮬레이션 상태
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const orbitRadius = 500;
+    let velocityAngle = 90; // 속도 방향(도, 아래쪽)
+    let forceDelta = 0;     // 힘, 속도 사이 각도 (도)
+    let forceMag = 0.15;    // 힘 크기(항상 0.15로 고정)
+    let velocityMag = Math.sqrt(forceMag * 55); // 원운동 조건
+    let forceAngle = 90;    // 힘 방향(도)
+    let posX = cx+55;          // 원의 위쪽 중간 지점
+    let posY = cy;
+    let trail = [{x: posX, y: posY}];
+
+    function drawArrow(startX, startY, angleDeg, length, color, label) {
+      const angleRad = angleDeg * Math.PI / 180;
+      const arrowX = startX + length * Math.cos(angleRad);
+      const arrowY = startY + length * Math.sin(angleRad);
+      // 화살표 선
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(arrowX, arrowY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      // 화살표 머리
+      const headlen = 15;
+      const angle1 = angleRad + Math.PI / 8;
+      const angle2 = angleRad - Math.PI / 8;
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(
+        arrowX - headlen * Math.cos(angle1),
+        arrowY - headlen * Math.sin(angle1)
+      );
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(
+        arrowX - headlen * Math.cos(angle2),
+        arrowY - headlen * Math.sin(angle2)
+      );
+      ctx.stroke();
+      // 라벨
+      ctx.font = '16px sans-serif';
+      ctx.fillStyle = color;
+      ctx.fillText(label, arrowX + 5, arrowY + 5);
+    }
+
+    function updateForce() {
+      // forceAngle은 각도에 따라, forceMag는 항상 0.15로 고정
+      if (Math.abs(forceDelta) === 90) {
+        forceAngle = (velocityAngle + (forceDelta > 0 ? 90 : -90) + 360) % 360;
+        // forceMag는 고정, velocityMag를 역산
+        velocityMag = Math.sqrt(forceMag * orbitRadius);
+      } else {
+        forceAngle = (velocityAngle + forceDelta + 360) % 360;
+        // forceMag는 고정, velocityMag는 변화 없음
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      updateForce();
+  
+      // 자취(trail) 점선으로 그리기
+      if (trail.length > 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(trail[0].x, trail[0].y);
+        for (let i = 1; i < trail.length; i++) {
+          ctx.lineTo(trail[i].x, trail[i].y);
+        }
+        ctx.strokeStyle = '#888';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      // 물체(작은 원)
+      ctx.beginPath();
+      ctx.arc(posX, posY, 8, 0, 2 * Math.PI);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.stroke();
+      // 화살표 길이 상수
+      const arrowLength = 60;
+      
+      // 각도 및 원운동 조건 안내 갱신
+      angleValue.innerHTML = forceDelta + '° <span id="orbitHint" style="color:#2ECC40;font-size:15px;"></span>';
+      const orbitHint = document.getElementById('orbitHint');
+      
+      // 속도 화살표(파랑)
+      drawArrow(posX, posY, velocityAngle, arrowLength, '#0074D9', '속도');
+      // 힘 화살표(빨강)
+      drawArrow(posX, posY, forceAngle, arrowLength, '#FF4136', '힘');
+      // 힘 크기 표시
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#FF4136';
+      ctx.fillText('힘 크기: ' + forceMag.toFixed(2), posX + 70, posY - 10);
+
+      // 배경에 고정된 원 궤적(orbitRadius) 실선으로 그리기
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 55, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]); // 실선
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 슬라이더 이벤트: forceDelta 조정
+    slider.addEventListener('input', function() {
+      forceDelta = parseInt(this.value, 10);
+      draw();
+    });
+
+    function doStep() {
+      updateForce();
+      let diff = ((forceAngle - velocityAngle + 540) % 360) - 180;
+      // 힘이 속도에 수직(90도 또는 -90도)일 때만 방향 보정
+      if (Math.abs(Math.abs(diff) - 90) < 1e-6) {
+        velocityAngle += diff * 0.1;
+        velocityAngle = (velocityAngle + 360) % 360;
+      }
+      // 힘이 속도와 평행(0°/180°)일 때는 방향 보정 없이 크기만 변화
+      // (모든 경우에 대해 크기 변화 적용)
+      velocityMag += forceMag * Math.cos(diff * Math.PI / 180) * 0.2;
+      // 아주 작은 값은 0으로 처리, 힘이 계속 작용하면 반대방향으로 재출발
+      if (Math.abs(velocityMag) < 1e-3) {
+        if (Math.abs(Math.cos(diff * Math.PI / 180)) > 0.99) { // 거의 평행(0도/180도)
+          velocityAngle = forceAngle;
+          velocityMag = 0.01;
+        } else {
+          velocityMag = 0;
+        }
+      }
+      // 음수 속도 처리: 방향 반전 (단, 0이 아닐 때만)
+      if (velocityMag < 0) {
+        velocityMag = -velocityMag;
+        velocityAngle = (velocityAngle + 180) % 360;
+      }
+      posX += velocityMag * Math.cos(velocityAngle * Math.PI / 180);
+      posY += velocityMag * Math.sin(velocityAngle * Math.PI / 180);
+      trail.push({x: posX, y: posY});
+      draw();
+    }
+
+    stepBtn.addEventListener('click', doStep);
+
+    runBtn.addEventListener('click', function() {
+      if (runInterval) {
+        clearInterval(runInterval);
+        runInterval = null;
+        runBtn.textContent = '연속';
+      } else {
+        runInterval = setInterval(doStep, 40);
+        runBtn.textContent = '정지';
+      }
+    });
+
+    // 초기화 시 연속 실행 중이면 멈춤
+    resetBtn.addEventListener('click', function() {
+      // 배경 원 오른쪽 중간 지점에서 시작 (반지름 55)
+      velocityAngle = 90;
+      forceDelta = 0;
+      forceMag = 0.15;
+      velocityMag = Math.sqrt(forceMag * 55); // 원운동 조건
+      posX = cx + 55;
+      posY = cy;
+      trail = [{x: posX, y: posY}];
+      slider.value = 90;
+      draw();
+    });
+
+    // 초기화
+    draw();
+  </script>
+</body>
+</html>

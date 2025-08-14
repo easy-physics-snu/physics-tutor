@@ -4,6 +4,7 @@ import time
 import sys
 import base64
 import streamlit as st
+import streamlit.components.v1 as components
 from typing import List
 from PIL import Image
 
@@ -271,7 +272,7 @@ with st.container(border=True):
             <style>
             /* iframe 컨테이너 스타일링 */
             .iframe-container {
-                width: 700px;
+                width: 950px;
                 height: 600px;
                 overflow: hidden;
                 position: relative;
@@ -279,7 +280,7 @@ with st.container(border=True):
             
             /* iframe 자체 스타일링 */
             .iframe-container iframe {
-                width: 720px;  /* 스크롤바 여유 공간 */
+                width: 950px;  /* 스크롤바 여유 공간 */
                 height: 800px;
                 border: none;
                 position: absolute;

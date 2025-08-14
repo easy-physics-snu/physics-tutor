@@ -4,6 +4,7 @@ import time
 import sys
 import base64
 import streamlit as st
+import streamlit.components.v1 as components
 from typing import List
 from PIL import Image
 
@@ -41,7 +42,7 @@ if "tutor_messages" not in st.session_state:
 
 DEFAULT_OPERATION = "예비실험실"
 
-PROBLEM_IMAGE_PATH = "images/problem_1.png"
+PROBLEM_IMAGE_PATH = "src/images/problem_1.png"
 
 def enalble_submit_button():
     st.session_state["submit_button_disabled"] = False
@@ -233,10 +234,10 @@ with st.expander(
     with main_tab1:
         _, col2, col3, _ = st.columns(4, vertical_alignment='center')
         col2.image(
-            image="images/satellite_moon.png",
+            image="src/images/satellite_moon.png",
         )
         col3.image(
-            image="images/satellite_orbit.png",
+            image="src/images/satellite_orbit.png",
             caption="그림 작성 예시",
             width=200
         )
@@ -474,7 +475,7 @@ with st.container(border=True):
             <style>
             /* iframe 컨테이너 스타일링 */
             .iframe-container {
-                width: 700px;
+                width: 950px;
                 height: 600px;
                 overflow: hidden;
                 position: relative;
@@ -482,7 +483,7 @@ with st.container(border=True):
             
             /* iframe 자체 스타일링 */
             .iframe-container iframe {
-                width: 720px;  /* 스크롤바 여유 공간 */
+                width: 950px;  /* 스크롤바 여유 공간 */
                 height: 800px;
                 border: none;
                 position: absolute;
@@ -493,16 +494,13 @@ with st.container(border=True):
             }
             </style>
         """, unsafe_allow_html=True)
-        # HTML div로 감싸서 iframe 생성
-        st.markdown("""
-            <div class="iframe-container">
-                <iframe 
-                    src="https://javalab.org/condition_of_circular_movement/"
-                    scrolling="no"
-                    frameborder="0"
-                ></iframe>
-            </div>
-        """, unsafe_allow_html=True)
+        # 로컬 HTML 파일 임베드
+        try:
+            with open('circular.html', 'r', encoding='utf-8') as f:
+                circular_html_content = f.read()
+            components.html(circular_html_content, height=520, width=950, scrolling=False)
+        except Exception as e:
+            st.error(f"로컬 시뮬레이션을 불러오는 중 오류가 발생했습니다: {e}")
     with tab2: 
         operation= "내 실험실"
         

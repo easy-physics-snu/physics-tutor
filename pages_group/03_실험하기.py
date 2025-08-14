@@ -259,12 +259,9 @@ if 'last_input' not in st.session_state:
 ########### 실험실 Logic ###########
 ###################################
 with st.container(border=True):
-
-########### 예비 실험실 ###########
-    operation = DEFAULT_OPERATION
-
     tab1, tab2 = st.tabs(["예비실험실", "내 실험실"])
 
+########### 예비 실험실 ###########
     with tab1: 
         operation= "예비실험실"
         # CSS 스타일 적용
@@ -291,16 +288,13 @@ with st.container(border=True):
             }
             </style>
         """, unsafe_allow_html=True)
-        # HTML div로 감싸서 iframe 생성
-        st.markdown("""
-            <div class="iframe-container">
-                <iframe 
-                    src="https://javalab.org/condition_of_circular_movement/"
-                    scrolling="no"
-                    frameborder="0"
-                ></iframe>
-            </div>
-        """, unsafe_allow_html=True)
+        # 로컬 HTML 파일 임베드
+        try:
+            with open('circular.html', 'r', encoding='utf-8') as f:
+                circular_html_content = f.read()
+            components.html(circular_html_content, height=520, width=950, scrolling=False)
+        except Exception as e:
+            st.error(f"로컬 시뮬레이션을 불러오는 중 오류가 발생했습니다: {e}")
 
 ########### 내 실험실 ###########
     with tab2: 

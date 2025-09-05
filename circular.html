@@ -23,7 +23,7 @@
 </head>
 <body>
   <div id="container">
-    <canvas id="myP5Canvas" width="800" height="400" style="border:1px solid #ccc;"></canvas>
+    <canvas id="myP5Canvas" width="800" height="600" style="border:1px solid #ccc;"></canvas>
     <div id="sidebar">
       <label for="angleSlider">힘의 각도 (도):</label>
       <input type="range" id="angleSlider" min="-180" max="180" value="0">
@@ -58,6 +58,7 @@
     let posX = cx+55;          // 원의 위쪽 중간 지점?? 오른쪽 중간
     let posY = cy;
     let trail = [{x: posX, y: posY}];
+    let lockedOrbitCenter = null; //+-90일 때 고정할 원의 중심//NEW
 
     function drawArrow(startX, startY, angleDeg, length, color, label) {
       const angleRad = angleDeg * Math.PI / 180;
@@ -138,16 +139,24 @@
       ctx.strokeStyle = '#333';
       ctx.stroke();
       // 화살표 길이 상수
-      const arrowLength = 55;
-      
+      //const arrowLength = 55;
+
+      //화살표 길이(속도 크기에 비례+클램프)
+      const vScale = 6; //px per speed unit
+      const vMin=10; // 최소 길이(px)
+      const vMax=130; // 최대 길이(px)
+      const velocityArrowLength=Math.min(vMax, Math.max(vMin, velocityMag*vScale));
+      const forceArrowLength=55;
+    
+
       // 각도 및 원운동 조건 안내 갱신
       angleValue.innerHTML = forceDelta + '° <span id="orbitHint" style="color:#2ECC40;font-size:15px;"></span>';
       const orbitHint = document.getElementById('orbitHint');
       
       // 속도 화살표(파랑)
-      drawArrow(posX, posY, velocityAngle, arrowLength, '#0074D9', '속도');
+      drawArrow(posX, posY, velocityAngle, velocityArrowLength, '#0074D9', '속도');
       // 힘 화살표(빨강)
-      drawArrow(posX, posY, forceAngle, arrowLength, '#FF4136', '힘');
+      drawArrow(posX, posY, forceAngle, forceArrowLength, '#FF4136', '힘');
       // 힘 크기 표시
       // ctx.font = '14px sans-serif';
       // ctx.fillStyle = '#FF4136';
@@ -159,7 +168,7 @@
       ctx.arc(cx, cy, 55, 0, 2 * Math.PI);
       ctx.strokeStyle = '#bbb';
       ctx.lineWidth = 2;
-      ctx.setLineDash([]); // 실선
+      ctx.setLineDash([6,6]); // 실선
       ctx.stroke();
       ctx.restore();
 
@@ -189,6 +198,15 @@
       // 현재 속도 방향을 기준으로 원하는 각도 차이만큼 힘 방향을 고정(앵커)
       forceDelta = parseInt(this.value, 10);
       forceAngle = (velocityAngle + forceDelta + 360) % 360;
+      //NEWNEWNEW
+      if (Math.abs(forceDelta)===90) {
+        lockedOrbitCenter = {
+          x: posX + orbitRadius * Math.cos(forceAngle * Math.PI/180),
+          y: posY + orbitRadius * Math.sin(forceAngle * Math.PI/180)
+        };
+      } else {
+        lockedOrbitCenter = null;
+      }
       draw();
     });
 
@@ -202,23 +220,51 @@
         velocityMag = Math.sqrt(forceMag * r);
         const omega = velocityMag / r; // rad/step 기준 (timeStep 대신 1 프레임 단위)
 
-        // 현재 각 위치
-        let theta = Math.atan2(posY - cy, posX - cx);
+        //NEWNEWNEW// 처음 진입 시 한 번만 중심 고정
+        if (!lockedOrbitCenter){
+          const faRad=forceAngle * Math.PI/180;
+          lockedOrbitCenter={
+            x:posX+r*Math.cos(faRad),
+            y:posY+r*Math.sin(faRad)
+          }
+        }
+
+        // 현재 각 위치(고정 중심 기준)
+        let theta = Math.atan2(posY - lockedOrbitCenter.y, posX - lockedOrbitCenter.x);
         const orient = forceDelta > 0 ? 1 : -1; // +90이면 반시계, -90이면 시계 방향
         const dt = 1; // 한 스텝당 단위 시간
         theta += orient * omega * dt;
 
-        // 위치를 정확히 원 위로 업데이트
-        posX = cx + r * Math.cos(theta);
-        posY = cy + r * Math.sin(theta);
+        // 위치를 정확히 원 위로 업데이트(고정 중심 기준)
+        posX = lockedOrbitCenter.x + r * Math.cos(theta);
+        posY = lockedOrbitCenter.y + r * Math.sin(theta);
 
-        // 속도 방향: 접선 방향 (반시계: +90°, 시계: -90°)
+        // 속도 방향: 접선 방향
         const thetaDeg = theta * 180 / Math.PI;
         velocityAngle = (thetaDeg + (orient > 0 ? 90 : -90) + 360) % 360;
 
-        // 힘 방향: 중심을 향하는 방사 방향으로 표시
-        //forceAngle = (Math.atan2(cy - posY, cx - posX) * 180 / Math.PI + 360) % 360;
+        // 힘 방향: 속도와 forceDelta 유지
         forceAngle = (velocityAngle + forceDelta + 360) % 360;
+
+
+
+        // // 현재 각 위치
+        // let theta = Math.atan2(posY - cy, posX - cx);
+        // const orient = forceDelta > 0 ? 1 : -1; // +90이면 반시계, -90이면 시계 방향
+        // const dt = 1; // 한 스텝당 단위 시간
+        // theta += orient * omega * dt;
+
+        // // 위치를 정확히 원 위로 업데이트
+        // posX = cx + r * Math.cos(theta);
+        // posY = cy + r * Math.sin(theta);
+
+        // // 속도 방향: 접선 방향 (반시계: +90°, 시계: -90°)
+        // const thetaDeg = theta * 180 / Math.PI;
+        // velocityAngle = (thetaDeg + (orient > 0 ? 90 : -90) + 360) % 360;
+
+        // // 힘 방향: 중심을 향하는 방사 방향으로 표시
+        // //forceAngle = (Math.atan2(cy - posY, cx - posX) * 180 / Math.PI + 360) % 360;
+        // forceAngle = (velocityAngle + forceDelta + 360) % 360;
 
         trail.push({x: posX, y: posY});
         draw();
@@ -267,6 +313,23 @@
       trail.push({x: posX, y: posY});
       draw();
     }
+
+    //NEWNEWNEW
+    //idealOrbitPoints=calculateIdealOrbit();
+    // 배경 원 오른쪽 중간 지점에서 시작 (반지름 55)
+    velocityAngle = 90;
+    forceDelta = 0;
+    forceMag = 1.5;
+    //orbitRadius=55;
+    velocityMag = Math.sqrt(forceMag * 55); // 초기 속도
+    posX = cx + 55;
+    posY = cy;
+    trail = [{x: posX, y: posY}];
+    slider.value = forceDelta;
+    lockedOrbitCenter = null;
+    // 초기에는 속도 방향에 대해 forceDelta만큼의 각도 차이를 갖도록 한 번만 앵커링
+    forceAngle = (velocityAngle + forceDelta + 360) % 360;
+    draw();
 
     stepBtn.addEventListener('click', doStep);
 

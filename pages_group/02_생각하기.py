@@ -285,7 +285,7 @@ with st.sidebar:
     toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
     st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
-    st.write("**AI 친구** 에게 물어보기")
+    st.write("**AI 친구**에게 물어보기")
     spinner_box = st.empty()
     messages = st.container(height=400)
 
@@ -312,11 +312,6 @@ with st.sidebar:
 
     # 이전 대화 기록 출력
     print_messages()
-
-    ##TODO 초기화 기능 구현
-    # # 초기화 버튼이 눌리면...
-    # if clear_btn:
-    #     st.session_state["messages"] = []
 
     # 사용자의 입력
     user_input = st.chat_input("궁금한 내용을 물어보세요!")

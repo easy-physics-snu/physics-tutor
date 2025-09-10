@@ -399,7 +399,7 @@ with st.sidebar:
 
     st.write("⏬ 혼자서 문제 풀기 너무 어렵다면? ⏬")
 
-    toggle_ai_helper = st.toggle("**AI 선생님** 에게 질문하기", value=False)
+    toggle_ai_helper = st.toggle("**AI 선생님**과 대화하기", value=False)
 
     if toggle_ai_helper:
 

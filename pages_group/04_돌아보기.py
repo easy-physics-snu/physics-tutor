@@ -382,7 +382,7 @@ with tab2:
 #####################################
 with st.sidebar:
 
-    st.write("**AI 선생님** 과 대화하기")
+    st.write("**AI 선생님**과 대화하기")
     messages = st.container(height=400)
     ai_info = st.empty()
 
@@ -415,6 +415,11 @@ with st.sidebar:
     # 새로운 메시지를 추가
     def add_message(role, message):
         st.session_state["messages_explanation"].append(ChatMessage(role=role, content=message))
+
+    # 초기 질문 표시 (제출 전에만)
+    if len(st.session_state["messages_explanation"]) == 0:
+        # Display the question directly
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("앞서 보았던 문제를 다시 한 번 도전해볼까요?")
 
     # 이전 대화 기록 출력
     print_messages()

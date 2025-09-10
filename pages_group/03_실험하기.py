@@ -379,7 +379,7 @@ with st.sidebar:
     toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
     st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
-    st.write("**AI 친구** 에게 물어보기")
+    st.write("**AI 친구**에게 물어보기")
     messages = st.container(height=400)
 
     # 이전 대화를 출력

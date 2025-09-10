@@ -19,8 +19,8 @@ st.session_state.api_key = st.secrets["openai_api_key"]
 
 TEXTBOOK_FILE_PATH = "src/textbooks/physics_textbook.pdf"
 
-TUTOR_OPENAI_MODEL = "gpt-4o"
-RAG_OPENAI_MODEL = "gpt-4o"
+TUTOR_OPENAI_MODEL = "gpt-4.1"
+RAG_OPENAI_MODEL = "gpt-4.1"
 RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
 
 SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
@@ -248,7 +248,7 @@ with tab2:
                 {"role": "system", "content": system_prompt_q2},
                 {"role": "user", "content": t2_q2_input}
             ]
-            response_q2 = client.chat.completions.create(model="gpt-4o", messages=messages_q2)
+            response_q2 = client.chat.completions.create(model="gpt-4.1-mini", messages=messages_q2)
             msg_q2 = response_q2.choices[0].message.content
         st.info(msg_q2)
         score_match = re.search(r'(\d+)점', msg_q2)
@@ -308,7 +308,7 @@ with tab2:
                 {"role": "system", "content": system_prompt_q3},
                 {"role": "user", "content": t2_q3_input}
             ]
-            response_q3 = client.chat.completions.create(model="gpt-4o", messages=messages_q3)
+            response_q3 = client.chat.completions.create(model="gpt-4.1-mini", messages=messages_q3)
             msg_q3 = response_q3.choices[0].message.content
         st.info(msg_q3)
         score_match = re.search(r'(\d+)점', msg_q3)

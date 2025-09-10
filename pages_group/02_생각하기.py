@@ -13,8 +13,6 @@ from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 from modules.prompts import INQUIRY_ASSISTANT_02THINK_PROMPT
 
-from modules.ExplorationTutor import EXPLORATION_SYSTEM_PROMPT
-
 st.session_state.api_key = st.secrets["openai_api_key"]
 
 # os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -26,7 +24,7 @@ PROBLEM_IMAGE_PATH = "src/images/satellite_orbit.png"
 MOON_IMAGE_PATH = "src/images/satellite_moon.png"
 CANVAS_IMAGE_PATH = "src/images/satellite_orbit_canvas.png"
 
-INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4o"
+INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4.1"
 
 SIDEBAR_AI_AVATAR = "src/images/ai_peer_avatar.png"
 
@@ -66,7 +64,7 @@ if "multimodal_chain_with_history" not in st.session_state:
 
 
 # 비동기 체인 생성
-async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4o"):
+async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
     # 멀티모달 객체를 세션 상태에서 가져오거나 생성
     if st.session_state["multimodal_chain_with_history"] is None:
         # 객체 생성
@@ -290,7 +288,7 @@ with st.sidebar:
     messages = st.container(height=400)
 
     selected_model = "gpt-4.1"
-    system_prompt = EXPLORATION_SYSTEM_PROMPT
+    system_prompt = INQUIRY_ASSISTANT_02THINK_PROMPT
 
     # 이전 대화를 출력
     def print_messages():

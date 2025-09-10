@@ -42,7 +42,7 @@ CANVAS_IMAGE_PATH = "src/images/satellite_orbit_canvas.png"
 
 REVIEW_IMAGE_PATH = "src/images/review_1.png"
 
-INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4o-mini" 
+INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4.1" 
 
 SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
 
@@ -89,7 +89,7 @@ def disalble_submit_button():
 
 
 # 비동기 체인 생성
-async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4o"):
+async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
     # 멀티모달 객체를 세션 상태에서 가져오거나 생성
     if st.session_state["explanation_multimodal_chain_with_history"] is None:
         # 객체 생성
@@ -223,15 +223,14 @@ with right_col:
         """, unsafe_allow_html=True)
 
     # Get user's previous answer and drawing from session state
-    user_drawing = st.session_state.get("predict_user_drawing", None)
+    user_drawing = st.session_state.get("predict_saved_image_path", None)
     user_reason = st.session_state.get("predict_user_reason", "이전 답안이 없습니다.")
     
-    # Convert numpy array to base64 image if it exists
+    # Convert saved image path to base64 image if it exists
     image_src = PROBLEM_IMAGE_PATH
     if user_drawing is not None:
-        
-        # Convert numpy array to PIL Image
-        img = Image.fromarray(user_drawing.astype('uint8'))
+        # Load image from saved file path
+        img = Image.open(user_drawing)
         
         # Convert PIL Image to base64
         buffered = io.BytesIO()
@@ -463,7 +462,7 @@ with st.sidebar:
                         feedback_container.markdown(ai_feedback)
                 
                 if response:
-                    st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
+                    st.success("🎉 AI 선생님의 피드백을 확인해보세요!")
                     
                     # 대화 기록에 추가
                     add_message("user", f"(제출한 답변): {st.session_state['explanation_user_reason']}")

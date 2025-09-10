@@ -49,7 +49,7 @@ if "show_resources" not in st.session_state:
     st.session_state["show_resources"] = False
 
 
-TUTOR_OPENAI_MODEL = "gpt-4o"
+TUTOR_OPENAI_MODEL = "gpt-4.1"
 
 SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
 
@@ -165,43 +165,46 @@ applyingModeledAnswer = "지구가 달에 지구 중심방향으로 향하는 �
 # 핵심 개념(나중엔 DB에서 불러오면 좋을 듯)
 essential_contents = "등속 원운동"
 
-# 메인 화면에 질문 표시
-st.markdown("**문제 상황**")
-st.markdown("위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?")
 
-# 답변 입력 영역
-text_area_key = st.session_state.get("text_area_key", 0)
-reason = st.text_area(
-    label="내 답변을 작성해주세요.",
-    height=200,
-    on_change=enable_submit_button,
-    key=f"text_area_{text_area_key}"
-)
+if not st.session_state.get("show_resources", False):
 
-if not reason:
-    disable_submit_button()
+    # 메인 화면에 질문 표시
+    st.markdown("**문제 상황**")
+    st.markdown("위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?")
 
-submit_button = st.button(
-    label="제출하기",
-    type="primary",
-    use_container_width=True,
-    disabled=st.session_state["submit_button_disabled"]
-)
+    # 답변 입력 영역
+    text_area_key = st.session_state.get("text_area_key", 0)
+    reason = st.text_area(
+        label="내 답변을 작성해주세요.",
+        height=200,
+        on_change=enable_submit_button,
+        key=f"text_area_{text_area_key}"
+    )
 
-if submit_button:
-    import time
-    current_time = time.time()
-    
-    # 같은 답변이 연속으로 제출되는 것을 방지 (5초 이내 중복 제출 방지)
-    if current_time - st.session_state.get("last_submission_time", 0) < 5:
-        st.warning("잠시 후 다시 시도해주세요.")
-    else:
-        st.session_state["explanation_user_reason"] = reason
-        st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
-        st.session_state["feedback_processed"] = False  # 피드백 처리 플래그 리셋
-        st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1  # text_area 키 변경
-        st.session_state["last_submission_time"] = current_time  # 제출 시간 기록
-        st.success("제출 완료! 오른쪽 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
+    if not reason:
+        disable_submit_button()
+
+    submit_button = st.button(
+        label="제출하기",
+        type="primary",
+        use_container_width=True,
+        disabled=st.session_state["submit_button_disabled"]
+    )
+
+    if submit_button:
+        import time
+        current_time = time.time()
+        
+        # 같은 답변이 연속으로 제출되는 것을 방지 (5초 이내 중복 제출 방지)
+        if current_time - st.session_state.get("last_submission_time", 0) < 5:
+            st.warning("잠시 후 다시 시도해주세요.")
+        else:
+            st.session_state["explanation_user_reason"] = reason
+            st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
+            st.session_state["feedback_processed"] = False  # 피드백 처리 플래그 리셋
+            st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1  # text_area 키 변경
+            st.session_state["last_submission_time"] = current_time  # 제출 시간 기록
+            st.success("제출 완료! 오른쪽 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
 
 # 메인 하단 리소스 섹션
 if st.session_state.get("show_resources", False):
@@ -388,21 +391,26 @@ with st.sidebar:
         # 사용자의 제출된 답변 표시
         messages.chat_message("user").write(f"(제출한 답변): {st.session_state['explanation_user_reason']}")
 
-        # AI 피드백 생성 (스트리밍)
-        response_stream = chain(st.session_state['explanation_user_reason'], False)
-        
-        # 대화가 완료되지 않은 경우에만 AI 응답 표시
-        if not st.session_state.get("conversation_completed", False):
-            with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
-                placeholder = st.empty()
-                streamed_text = ""  # Initialize empty string to accumulate streamed content
-                
-                # 스트리밍 응답 처리
-                for chunk in response_stream:
-                    if hasattr(chunk, 'content'):
-                        streamed_text += chunk.content
-                        placeholder.markdown(streamed_text)
-                        time.sleep(0.02)
+        # AI 피드백 생성 (스트리밍) - 스피너와 함께
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+            response_stream = chain(st.session_state['explanation_user_reason'], False)
+            
+            # 대화가 완료되지 않은 경우에만 AI 응답 표시
+            if not st.session_state.get("conversation_completed", False):
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
+                    placeholder = st.empty()
+                    streamed_text = ""  # Initialize empty string to accumulate streamed content
+                    
+                    # 스트리밍 응답 처리
+                    for chunk in response_stream:
+                        if hasattr(chunk, 'content'):
+                            streamed_text += chunk.content
+                            placeholder.markdown(streamed_text)
+                            time.sleep(0.02)
+
+                # AI 답변 완료 후 성공 메시지 표시
+                if response_stream:
+                    st.success("🎉 AI 선생님의 피드백을 확인해보세요!")
 
             # AI 답변에서 점수 추출하여 진행률 업데이트
             try:
@@ -435,7 +443,9 @@ with st.sidebar:
                         missing_text = ''.join(st.session_state['missing_contents']).strip()
                         if missing_text:  # 빈 문자열이 아닌 경우에만 출력
                             st.write(f"   지금도 충분히 좋은 답변이지만, [{missing_text}] 를 포함하여 작성했다면 더 완벽한 답이 작성되었겠네요.")
-                    st.write("오늘 수업은 여기까지입니다.")
+                    st.write("오늘 수업은 여기까지입니다. 잠시 뒤 수업 마무리 화면으로 넘어갑니다.")
+                    time.sleep(6)
+                    st.rerun()
                 
                 # 대화 종료를 위한 플래그 설정
                 st.session_state["conversation_completed"] = True

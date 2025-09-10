@@ -1,5 +1,6 @@
 import re
 import os
+import io
 import time
 import sys
 import base64
@@ -41,7 +42,7 @@ if "tutor_messages" not in st.session_state:
     st.session_state["tutor_messages"] = []
 
 DEFAULT_OPERATION = "예비실험실"
-INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4o-mini"
+INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4.1"
 
 PROBLEM_IMAGE_PATH = "src/images/satellite_orbit.png"
 MOON_IMAGE_PATH = "src/images/satellite_moon.png"
@@ -185,24 +186,20 @@ with right_col:
         """, unsafe_allow_html=True)
 
     # Get user's previous answer and drawing from session state
-    user_drawing = st.session_state.get("predict_user_drawing", None)
+    user_drawing = st.session_state.get("predict_saved_image_path", None)
     user_reason = st.session_state.get("predict_user_reason", "이전 답안이 없습니다.")
     
-    # Convert numpy array to base64 image if it exists
+    # Convert saved image path to base64 image if it exists
     image_src = PROBLEM_IMAGE_PATH
     if user_drawing is not None:
-        import base64
-        from PIL import Image
-        import io
-        
-        # Convert numpy array to PIL Image
-        img = Image.fromarray(user_drawing.astype('uint8'))
+        # Load image from saved file path
+        img = Image.open(user_drawing)
         
         # Convert PIL Image to base64
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
-        image_src = f"data:src/image/png;base64,{img_str}"
+        image_src = f"data:image/png;base64,{img_str}"
     
     # Create tooltip content with styled button
     if user_drawing is not None and user_reason is not None:
@@ -211,7 +208,7 @@ with right_col:
             <div class="button-container">
             <div class="tooltip-wrapper">
                 <button class="custom-button">
-                        내가 제출한 답 보기
+                        <생각하기>에서 제출한 답
                 </button>
                 <div class="tooltip-content">
                     <div class="drawing-explanation" style="font-size: 15px;">캔버스</div>
@@ -224,10 +221,10 @@ with right_col:
         <div class="button-container">
         <div class="tooltip-wrapper">
             <button class="custom-button">
-                    내가 제출한 답 보기
+                    <생각하기>에서 제출한 답
             </button>
             <div class="tooltip-content">
-                <div class="answer-text">아직 제출한 답안이 없습니다! '생각하기'에서 답안을 제출해주세요:)</div>
+                <div class="answer-text">아직 제출한 답안이 없습니다! '생각하기 🤔'에서 답안을 제출해주세요:)</div>
             </div>"""
     st.markdown(tooltip_html, unsafe_allow_html=True)
 

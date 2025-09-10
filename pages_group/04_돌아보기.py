@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
 from modules.prompts import INQUIRY_ASSISTANT_04REFLECT_PROMPT
-from modules.utils import process_png_to_bytesio
+from modules.utils import process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -44,6 +44,8 @@ REVIEW_IMAGE_PATH = "src/images/review_1.png"
 
 INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4o-mini" 
 
+SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
+
 if "submit_button_disabled" not in st.session_state:
     st.session_state["submit_button_disabled"] = True
 
@@ -59,12 +61,24 @@ if "explanation_multimodal_chain_with_history" not in st.session_state:
     st.session_state["explanation_multimodal_chain_with_history"] = None
 
 def save_draw_image(numpy_array):
-    image = Image.fromarray(numpy_array)
-    current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    file_name = f"e-drawing-{current_time}"
-    file_path = f"src/draw_images/{file_name}.png"
-    image.save(file_path, format="PNG")
-    return file_path
+    """
+    사용자 그림을 저장합니다.
+    """
+    try:
+        image = Image.fromarray(numpy_array)
+        current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        file_name = f"e-drawing-{current_time}"
+        file_path = f"src/draw_images/{file_name}.png"
+        
+        # 디렉토리가 존재하는지 확인하고 생성
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        image.save(file_path, format="PNG")
+        print(f"이미지 저장 완료: {file_path}")
+        return file_path
+    except Exception as e:
+        st.error(f"이미지 저장 중 오류가 발생했습니다: {str(e)}")
+        return None
 
 
 def enalble_submit_button():
@@ -125,7 +139,7 @@ with left_col:
     message = """
 - 캔버스에 최종적으로 생각한 **(1)답안**과 그 **(2)이유**를 적어주세요.
 - 정답을 적으면 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다.
-- 🧑🏻‍🏫**AI 튜터**와 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
+- 🧑🏻‍🏫**AI 선생님**과 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
 """
     st.info(message)
 
@@ -279,13 +293,19 @@ with tab1:
 
     st.text("최종적으로 문제를 해결해보세요.")
     st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
+    
+    # 캔버스 이미지 미리 로딩
+    with st.spinner("캔버스 이미지를 준비 중..."):
+        ensure_canvas_image_loaded(CANVAS_IMAGE_PATH, (500, 500))
+    
     # Create a canvas component
-    canvas_result = st_canvas(
+    # 비동기 강제 이미지 로딩 캔버스 생성 (반드시 이미지 표시)
+    canvas_result = create_async_canvas_with_guaranteed_image(
+        CANVAS_IMAGE_PATH,
         fill_color="rgba(255, 165, 0, 0.3)",  # Fixed fill color with some opacity
         stroke_width=3,
         stroke_color="#000000",
         background_color="#EEEEEE",
-        background_image=Image.open(CANVAS_IMAGE_PATH),
         update_streamlit=True,
         height=500,
         width=500,
@@ -362,7 +382,7 @@ with tab2:
 #####################################
 with st.sidebar:
 
-    st.text("AI와 대화하기")
+    st.write("**AI 선생님** 과 대화하기")
     messages = st.container(height=400)
     ai_info = st.empty()
 
@@ -378,7 +398,7 @@ with st.sidebar:
             else:
                 pass
         else:
-            ai_info.info("내 답안을 제출하면 🧑🏻‍🏫AI 튜터와 대화가 시작됩니다!")
+            ai_info.info("내 답안을 제출하면 🧑🏻‍🏫AI 선생님과 대화가 시작됩니다!")
 
     # 모델 선택 메뉴
     selected_model = INQUIRY_ASSISTANT_OPENAI_MODEL
@@ -387,7 +407,10 @@ with st.sidebar:
     # 이전 대화를 출력
     def print_messages():
         for chat_message in st.session_state["messages_explanation"]:
-            messages.chat_message(chat_message.role).write(chat_message.content)
+            if chat_message.role == "assistant":
+                messages.chat_message(chat_message.role, avatar=SIDEBAR_AI_AVATAR).write(chat_message.content)
+            else:
+                messages.chat_message(chat_message.role).write(chat_message.content)
 
     # 새로운 메시지를 추가
     def add_message(role, message):
@@ -426,7 +449,7 @@ with st.sidebar:
                 )
                                         
                 # AI 답변을 스트리밍으로 표시
-                with messages.chat_message("assistant"):
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     feedback_container = st.empty()
                     ai_feedback = ""
                     
@@ -453,7 +476,7 @@ with st.sidebar:
                 st.session_state["explanation_submission_triggered"] = False  # 트리거 상태 리셋
 
         # 사용자의 입력
-        user_input = st.chat_input("🧑🏻‍🏫AI 튜터의 질문에 대한 답변을 작성해주세요.")
+        user_input = st.chat_input("🧑🏻‍🏫AI 선생님의 질문에 대한 답변을 작성해주세요.")
 
         # 만약에 사용자 입력이 들어오면...
         if user_input:
@@ -471,7 +494,7 @@ with st.sidebar:
                     # 사용자의 입력
                     messages.chat_message("user").write(user_input)
 
-                    with messages.chat_message("assistant"):
+                    with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                         # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
                         container = st.empty()
 

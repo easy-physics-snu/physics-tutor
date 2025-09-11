@@ -333,7 +333,7 @@ with st.sidebar:
                 response = loop.run_until_complete(
                     handle_submission_async(
                         image_filepath,
-                        f"저는 다음과 같은 답변과 그에 대한 캔버스 그림을 제출했습니다. image_url의 제출된 <그림 답안>과 text로 쓰여진 <다음의 이유>를 보고 저에게 적절한 피드백을 제공해주세요: {st.session_state["predict_user_reason"]}", 
+                        f"저는 다음과 같은 답변과 그에 대한 캔버스 그림을 제출했습니다. image_url의 제출된 <그림 답안>과 text로 쓰여진 <다음의 이유>를 보고 저에게 적절한 피드백을 제공해주세요: {st.session_state['predict_user_reason']}", 
                         system_prompt,
                         selected_model
                     )

@@ -94,7 +94,7 @@ async def generate_answer_async(image_filepath, system_prompt, user_prompt, mode
     if st.session_state["explanation_multimodal_chain_with_history"] is None:
         # 객체 생성
         llm = ChatOpenAI(
-            temperature=0,
+            temperature=0.2,
             model_name=model_name,
             openai_api_key = st.session_state.api_key
         )
@@ -479,8 +479,11 @@ with st.sidebar:
                 st.session_state["explanation_submission_in_progress"] = False
                 st.session_state["explanation_submission_triggered"] = False  # 트리거 상태 리셋
 
-    # 사용자의 입력 (답안 제출 여부와 관계없이 항상 처리)
-    user_input = st.chat_input("🧑🏻‍🏫AI 선생님의 질문에 대한 답변을 작성해주세요.")
+    # 사용자의 입력 (답안 제출 후에만 표시)
+    if "explanation_saved_image_path" in st.session_state and "explanation_user_reason" in st.session_state:
+        user_input = st.chat_input("🧑🏻‍🏫AI 선생님의 질문에 대한 답변을 작성해주세요.")
+    else:
+        user_input = None
 
     # 만약에 사용자 입력이 들어오면...
     if user_input:

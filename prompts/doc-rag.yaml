@@ -7,6 +7,9 @@ template: |
   Be sure to include your source and page numbers in your answer.
   Answer in Korean.
 
+  #Previous Conversation:
+  {history}
+
   #Example Format:
   (brief summary of the answer)
   (table)
@@ -22,4 +25,4 @@ template: |
   {context} 
 
   #Answer:
-input_variables: ["question", "context"]
+input_variables: ["question", "context", "history"]

@@ -260,42 +260,22 @@ if 'last_input' not in st.session_state:
 ###################################
 ########### 실험실 Logic ###########
 ###################################
-
-########### 예비 실험실 ###########
 with st.container(border=True):
 
     st.subheader("물리 시뮬레이션 실험실")
 
-    # operation= "예비실험실"
-    # CSS 스타일 적용
-    st.markdown("""
-        <style>
-        /* iframe 컨테이너 스타일링 */
-        .iframe-container {
-            width: 950px;
-            height: 600px;
-            overflow: hidden;
-            position: relative;
-        }
-        
-        /* iframe 자체 스타일링 */
-        .iframe-container iframe {
-            width: 950px;  /* 스크롤바 여유 공간 */
-            height: 800px;
-            border: none;
-            position: absolute;
-            top: -250px;  /* 상단 여백 조절 */
-            left: 0;
-            margin: 0;
-            padding: 0;
-        }
-        </style>
-    """, unsafe_allow_html=True)
     # 로컬 HTML 파일 임베드
     try:
-        with open('circular.html', 'r', encoding='utf-8') as f:
+        with open('circular-motion-sim_responsive.html', 'r', encoding='utf-8') as f:
             circular_html_content = f.read()
-        components.html(circular_html_content, height=520, width=950, scrolling=False)
+        
+        components.html(circular_html_content, height=1200, width=675, scrolling=False)
+
+        st.markdown("""
+        <style>
+        /* components.html이 만드는 iframe을 부모 너비에 맞추기 */
+        [data-testid="stIFrame"] > iframe { width: 100% !important; }
+        </style>""", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"로컬 시뮬레이션을 불러오는 중 오류가 발생했습니다: {e}")
 

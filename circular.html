@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <title>원운동 알짜힘 방향 탐구</title>
   <style>
+    :root {
+      --app-font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Helvetica Neue", Arial, sans-serif;
+    }
+    body, button, input, label, #angleValue {
+      font-family: var(--app-font-stack);
+    }
     #container {
       display: flex;
       align-items: center;
@@ -25,7 +31,7 @@
   <div id="container">
     <canvas id="myP5Canvas" width="800" height="600" style="border:1px solid #ccc;"></canvas>
     <div id="sidebar">
-      <label for="angleSlider">힘의 각도 (도):</label>
+      <label for="angleSlider">힘의 각도 (방향):</label>
       <input type="range" id="angleSlider" min="-180" max="180" value="0">
       <div id="angleValue">0° </div>
       <button id="resetBtn">초기화</button>
@@ -88,7 +94,7 @@
       );
       ctx.stroke();
       // 라벨
-      ctx.font = '16px sans-serif';
+      ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Helvetica Neue", Arial, sans-serif';
       ctx.fillStyle = color;
       ctx.fillText(label, arrowX + 5, arrowY + 5);
     }

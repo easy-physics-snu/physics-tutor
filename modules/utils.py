@@ -2,6 +2,7 @@ import io
 import os
 import numpy as np
 import streamlit as st
+from streamlit_drawable_canvas import st_canvas
 from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image

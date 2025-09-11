@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>원운동 힘 방향 탐구</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .main-container {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 28px;
+    }
+    
+    #container {
+      display: flex;
+      gap: 30px;
+      align-items: flex-start;
+    }
+    
+    #myCanvas {
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+    
+    #controls {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 280px;
+    }
+    
+    .control-group {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    
+    .control-group h3 {
+      margin-top: 0;
+      color: #555;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    
+    .slider-container {
+      margin-bottom: 15px;
+    }
+    
+    .slider-container label {
+      display: block;
+      margin-bottom: 5px;
+      color: #666;
+      font-size: 13px;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #ddd;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+    }
+    
+    .slider-value {
+      text-align: center;
+      font-size: 16px;
+      color: #333;
+      font-weight: 600;
+      margin-top: 5px;
+      margin-bottom: 10px;
+    }
+    
+    #angleValue {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    #resetBtn {
+      background: #ff6b6b;
+      color: white;
+    }
+    
+    #resetBtn:hover {
+      background: #ff5252;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255,107,107,0.3);
+    }
+    
+    #stepBtn {
+      background: #4ecdc4;
+      color: white;
+    }
+    
+    #stepBtn:hover {
+      background: #45b7b8;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(78,205,196,0.3);
+    }
+    
+    #runBtn {
+      background: #667eea;
+      color: white;
+    }
+    
+    #runBtn:hover {
+      background: #5a6fd8;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+    }
+    
+    .info-panel {
+      background: #f0f7ff;
+      border-left: 4px solid #667eea;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    
+    .info-panel h3 {
+      margin-top: 0;
+      color: #333;
+      font-size: 13px;
+    }
+    
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 6px 0;
+      font-size: 12px;
+    }
+    
+    .info-label {
+      color: #666;
+    }
+    
+    .info-value {
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .legend {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .legend-color {
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+    }
+  
+/* ===== Responsive layout for Streamlit embedding ===== */
+.main-container {
+  /* Keep content inside viewport on narrow screens */
+  width: min(1200px, 95vw);
+  padding: clamp(16px, 2.5vw, 30px);
+}
+
+#container {
+  gap: clamp(16px, 2vw, 30px);
+  align-items: flex-start;
+}
+
+#myCanvas {
+  /* Scale display size while keeping internal drawing resolution (800x600) */
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+#controls {
+  min-width: 280px;
+}
+
+/* Stack vertically on smaller widths */
+@media (max-width: 1150px) {
+  #container {
+    flex-direction: column;
+    align-items: center;
+  }
+  #controls {
+    width: 100%;
+    min-width: 0;
+  }
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+/* ===== End responsive layout ===== */
+</style>
+</head>
+<body>
+  <div class="main-container">
+    <h1>🌍 원운동 힘 방향 탐구</h1>
+    <div id="container">
+      <canvas id="myCanvas" width="800" height="600"></canvas>
+      <div id="controls">
+        <div class="control-group">
+          <h3>⚙️ 시뮬레이션 제어</h3>
+          
+          <div class="slider-container">
+            <label for="angleSlider">힘의 각도 (힘의 방향)</label>
+            <input type="range" id="angleSlider" min="-180" max="180" value="0" step="1">
+            <div class="slider-value" id="angleValue">0°</div>
+          </div>
+          
+          <div class="slider-container">
+            <label for="forceSlider">힘의 크기</label>
+            <input type="range" id="forceSlider" min="0.5" max="5" value="1.5" step="0.1">
+            <div class="slider-value" id="forceValue">1.5</div>
+          </div>
+          
+          <div class="slider-container">
+            <label for="radiusSlider">궤도 반지름</label>
+            <input type="range" id="radiusSlider" min="30" max="150" value="55" step="5">
+            <div class="slider-value" id="radiusValue">55 px</div>
+          </div>
+          
+          <div class="buttons">
+            <button id="resetBtn">초기화</button>
+            <button id="stepBtn">스텝</button>
+            <button id="runBtn">연속</button>
+          </div>
+        </div>
+        
+        <div class="info-panel">
+          <h3>📊 현재 상태</h3>
+          <div class="info-item">
+            <span class="info-label">속도 크기:</span>
+            <span class="info-value" id="velocityMagDisplay">-</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">속도 방향:</span>
+            <span class="info-value" id="velocityAngleDisplay">-</span>
+          </div>
+        </div>
+        
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background: #0074D9;"></div>
+            <span>속도</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #FF4136;"></div>
+            <span>힘</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #888;"></div>
+            <span>궤적</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+    const angleSlider = document.getElementById('angleSlider');
+    const forceSlider = document.getElementById('forceSlider');
+    const radiusSlider = document.getElementById('radiusSlider');
+    const angleValue = document.getElementById('angleValue');
+    const forceValue = document.getElementById('forceValue');
+    const radiusValue = document.getElementById('radiusValue');
+    const resetBtn = document.getElementById('resetBtn');
+    const stepBtn = document.getElementById('stepBtn');
+    const runBtn = document.getElementById('runBtn');
+    const velocityMagDisplay = document.getElementById('velocityMagDisplay');
+    const velocityAngleDisplay = document.getElementById('velocityAngleDisplay');
+    
+    let runInterval = null;
+    const angleStep = 0.55;
+    const speedStep = 0.25;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    
+    let orbitRadius = 55;
+    let velocityAngle = 90;
+    let forceDelta = 0;
+    let forceMag = 1.5;
+    let velocityMag = Math.sqrt(forceMag * orbitRadius);
+    let forceAngle = 90;
+    let posX = cx + orbitRadius;
+    let posY = cy;
+    let trail = [{x: posX, y: posY}];
+    let lockedOrbitCenter = null;
+    const maxTrailLength = 500;
+
+    function drawArrow(startX, startY, angleDeg, length, color, label, lineWidth = 4) {
+      const angleRad = angleDeg * Math.PI / 180;
+      const arrowX = startX + length * Math.cos(angleRad);
+      const arrowY = startY + length * Math.sin(angleRad);
+      
+      ctx.save();
+      
+      // 화살표 선
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(arrowX, arrowY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      
+      // 화살표 머리
+      const headlen = 15;
+      const angle1 = angleRad + Math.PI / 6;
+      const angle2 = angleRad - Math.PI / 6;
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(
+        arrowX - headlen * Math.cos(angle1),
+        arrowY - headlen * Math.sin(angle1)
+      );
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(
+        arrowX - headlen * Math.cos(angle2),
+        arrowY - headlen * Math.sin(angle2)
+      );
+      ctx.stroke();
+      
+      // 라벨
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillStyle = color;
+      ctx.shadowColor = 'rgba(255,255,255,0.8)';
+      ctx.shadowBlur = 3;
+      const labelX = arrowX + 15 * Math.cos(angleRad);
+      const labelY = arrowY + 15 * Math.sin(angleRad);
+      ctx.fillText(label, labelX, labelY);
+      
+      ctx.restore();
+    }
+
+    function updateStatus() {
+      velocityMagDisplay.textContent = velocityMag.toFixed(2);
+      velocityAngleDisplay.textContent = velocityAngle.toFixed(0) + '°';
+    }
+
+    function draw() {
+      // 배경 그라데이션
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, canvas.width/2);
+      gradient.addColorStop(0, '#ffffff');
+      gradient.addColorStop(1, '#f0f0f0');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 격자 그리기
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= canvas.width; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+      }
+      for (let i = 0; i <= canvas.height; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(canvas.width, i);
+        ctx.stroke();
+      }
+      
+      // 기준 원궤도
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbitRadius, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#bbb';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.stroke();
+      ctx.restore();
+      
+      // 중심점
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = '#666';
+      ctx.fill();
+      
+      // 궤적 그리기
+      if (trail.length > 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(trail[0].x, trail[0].y);
+        
+        for (let i = 1; i < trail.length; i++) {
+          const alpha = i / trail.length;
+          ctx.lineTo(trail[i].x, trail[i].y);
+        }
+        
+        ctx.strokeStyle = '#888';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.6;
+        ctx.stroke();
+        ctx.restore();
+      }
+      
+      // 물체
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(posX, posY, 10, 0, 2 * Math.PI);
+      const objGradient = ctx.createRadialGradient(posX-3, posY-3, 0, posX, posY, 10);
+      objGradient.addColorStop(0, '#444');
+      objGradient.addColorStop(1, '#111');
+      ctx.fillStyle = objGradient;
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+      
+      // 화살표 그리기
+      const vScale = 6;
+      const vMin = 10;
+      const vMax = 130;
+      const velocityArrowLength = Math.min(vMax, Math.max(vMin, velocityMag * vScale));
+      const forceArrowLength = forceMag * 25; // 힘 크기에 비례하는 화살표 길이
+      
+      // 속도 화살표
+      drawArrow(posX, posY, velocityAngle, velocityArrowLength, '#0074D9', '속도', 3);
+      
+      // 힘 화살표
+      drawArrow(posX, posY, forceAngle, forceArrowLength, '#FF4136', '힘', 3);
+      
+      updateStatus();
+    }
+
+    function doStep() {
+      // ±90° 특수 처리
+      if (Math.abs(forceDelta) === 90) {
+        const r = orbitRadius;
+        velocityMag = Math.sqrt(forceMag * r);
+        const omega = velocityMag / r;
+        
+        if (!lockedOrbitCenter) {
+          const faRad = forceAngle * Math.PI / 180;
+          lockedOrbitCenter = {
+            x: posX + r * Math.cos(faRad),
+            y: posY + r * Math.sin(faRad)
+          };
+        }
+        
+        let theta = Math.atan2(posY - lockedOrbitCenter.y, posX - lockedOrbitCenter.x);
+        const orient = forceDelta > 0 ? 1 : -1;
+        const dt = 1;
+        theta += orient * omega * dt;
+        
+        posX = lockedOrbitCenter.x + r * Math.cos(theta);
+        posY = lockedOrbitCenter.y + r * Math.sin(theta);
+        
+        const thetaDeg = theta * 180 / Math.PI;
+        velocityAngle = (thetaDeg + (orient > 0 ? 90 : -90) + 360) % 360;
+        forceAngle = (velocityAngle + forceDelta + 360) % 360;
+        
+        trail.push({x: posX, y: posY});
+        if (trail.length > maxTrailLength) trail.shift();
+        draw();
+        return;
+      }
+      
+      // 일반 경우
+      if (Math.abs(forceDelta) !== 180) {
+        forceAngle = (velocityAngle + forceDelta + 360) % 360;
+      }
+      
+      let diff = ((forceAngle - velocityAngle + 540) % 360) - 180;
+      const diffRad = diff * Math.PI / 180;
+      const forceTangential = forceMag * Math.cos(diffRad);
+      const forceNormal = forceMag * Math.sin(diffRad);
+      
+      const minSpeed = 1e-6;
+      const dThetaRad = (forceNormal / Math.max(velocityMag, minSpeed)) * angleStep;
+      velocityAngle = (velocityAngle + (dThetaRad * 180 / Math.PI) + 360) % 360;
+      
+      velocityMag += forceTangential * speedStep;
+      
+      if (Math.abs(velocityMag) < 1e-3) {
+        if (Math.abs(Math.cos(diff * Math.PI / 180)) > 0.99) {
+          velocityAngle = forceAngle;
+          velocityMag = 0.2;
+        } else {
+          velocityMag = 0;
+        }
+      }
+      
+      if (velocityMag < 0) {
+        velocityMag = -velocityMag;
+        velocityAngle = (velocityAngle + 180) % 360;
+      }
+      
+      posX += velocityMag * Math.cos(velocityAngle * Math.PI / 180);
+      posY += velocityMag * Math.sin(velocityAngle * Math.PI / 180);
+      
+      trail.push({x: posX, y: posY});
+      if (trail.length > maxTrailLength) trail.shift();
+      
+      draw();
+    }
+
+    function reset() {
+      if (runInterval) {
+        clearInterval(runInterval);
+        runInterval = null;
+        runBtn.textContent = '연속';
+      }
+      
+      velocityAngle = 90;
+      forceDelta = 0;
+      forceMag = parseFloat(forceSlider.value);
+      orbitRadius = parseInt(radiusSlider.value);
+      velocityMag = Math.sqrt(forceMag * orbitRadius);
+      posX = cx + orbitRadius;
+      posY = cy;
+      trail = [{x: posX, y: posY}];
+      angleSlider.value = forceDelta;
+      angleValue.textContent = '0°';
+      lockedOrbitCenter = null;
+      forceAngle = (velocityAngle + forceDelta + 360) % 360;
+      draw();
+    }
+
+    // 이벤트 리스너
+    angleSlider.addEventListener('input', function() {
+      forceDelta = parseInt(this.value, 10);
+      angleValue.textContent = forceDelta + '°';
+      forceAngle = (velocityAngle + forceDelta + 360) % 360;
+      
+      if (Math.abs(forceDelta) === 90) {
+        lockedOrbitCenter = {
+          x: posX + orbitRadius * Math.cos(forceAngle * Math.PI / 180),
+          y: posY + orbitRadius * Math.sin(forceAngle * Math.PI / 180)
+        };
+      } else {
+        lockedOrbitCenter = null;
+      }
+      
+      draw();
+    });
+
+    forceSlider.addEventListener('input', function() {
+      forceMag = parseFloat(this.value);
+      forceValue.textContent = forceMag.toFixed(1);
+      
+      // 90도일 때 속도 크기 재계산
+      if (Math.abs(forceDelta) === 90) {
+        velocityMag = Math.sqrt(forceMag * orbitRadius);
+      }
+      
+      draw();
+    });
+
+    radiusSlider.addEventListener('input', function() {
+      const newRadius = parseInt(this.value);
+      radiusValue.textContent = newRadius + ' px';
+      
+      // 위치를 새로운 반지름에 맞게 조정
+      const currentDistance = Math.sqrt((posX - cx) ** 2 + (posY - cy) ** 2);
+      if (currentDistance > 0) {
+        const angle = Math.atan2(posY - cy, posX - cx);
+        // 반지름 변경 시 현재 각도 유지하며 위치 조정
+        const ratio = newRadius / orbitRadius;
+        posX = cx + (posX - cx) * ratio;
+        posY = cy + (posY - cy) * ratio;
+      }
+      
+      orbitRadius = newRadius;
+      
+      // 85°~95° 범위에서 속도 크기 재계산
+      if (Math.abs(Math.abs(forceDelta) - 90) <= 5) {
+        const weight = 1 - Math.abs(Math.abs(forceDelta) - 90) / 5;
+        const idealVelocityMag = Math.sqrt(forceMag * orbitRadius);
+        velocityMag = idealVelocityMag * weight + velocityMag * (1 - weight);
+        // 중심점도 재계산
+        if (lockedOrbitCenter) {
+          const faRad = forceAngle * Math.PI / 180;
+          lockedOrbitCenter = {
+            x: posX + orbitRadius * Math.cos(faRad),
+            y: posY + orbitRadius * Math.sin(faRad)
+          };
+        }
+      }
+      
+      draw();
+    });
+
+    stepBtn.addEventListener('click', doStep);
+
+    runBtn.addEventListener('click', function() {
+      if (runInterval) {
+        clearInterval(runInterval);
+        runInterval = null;
+        runBtn.textContent = '연속';
+      } else {
+        runInterval = setInterval(doStep, 40);
+        runBtn.textContent = '정지';
+      }
+    });
+
+    resetBtn.addEventListener('click', reset);
+
+    // 초기화
+    reset();
+  </script>
+</body>
+</html>

@@ -10,18 +10,9 @@ from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
 from modules.keywords import create_keyword
-from modules.utils import overlay_png_and_np, process_png_to_bytesio
-from modules.prompts import INQUIRY_ASSISTANT_02THINK_PROMPT
+from modules.utils import overlay_png_and_np, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
-
-# API KEY 정보로드
-# config = settings.load_config()
-# if "api_key" in config:
-#     st.session_state.api_key = config["api_key"]
-#     st.write(f'사용자 입력 API키 : {st.session_state.api_key[-5:]}')
-# else : 
-#     st.session_state.api_key = st.secrets["openai_api_key"]
-#     st.write(f'API키 : {st.secrets["openai_api_key"][-5:]}')
+from modules.prompts import PEER_AI_02THINK_PROMPT
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -34,8 +25,9 @@ PROBLEM_IMAGE_PATH = "src/images/satellite_orbit.png"
 MOON_IMAGE_PATH = "src/images/satellite_moon.png"
 CANVAS_IMAGE_PATH = "src/images/satellite_orbit_canvas.png"
 
-INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4o"
+INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4.1"
 
+SIDEBAR_AI_AVATAR = "src/images/ai_peer_avatar.png"
 
 # Initialize session state for the button
 if 'button_pressed' not in st.session_state:
@@ -57,7 +49,7 @@ if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
 st.title("생각하기 🤔")
-st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤓**AI 탐구도우미**에게 물어보세요!")
+st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤓**AI 친구**에게 물어보세요.")
 
 
 # 처음 1번만 실행하기 위한 코드
@@ -73,7 +65,7 @@ if "multimodal_chain_with_history" not in st.session_state:
 
 
 # 비동기 체인 생성
-async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4o"):
+async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
     # 멀티모달 객체를 세션 상태에서 가져오거나 생성
     if st.session_state["multimodal_chain_with_history"] is None:
         # 객체 생성
@@ -100,12 +92,66 @@ async def generate_answer_async(image_filepath, system_prompt, user_prompt, mode
 
 
 def save_draw_image(numpy_array):
-    image = overlay_png_and_np(CANVAS_IMAGE_PATH, numpy_array)
-    current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    file_name = f"p-drawing-{current_time}"
-    file_path = f"src/draw_images/{file_name}.png"
-    image.save(file_path, format="PNG")
-    return file_path
+    """
+    캔버스 이미지와 사용자 그림을 합성하여 저장합니다.
+    CANVAS_IMAGE_PATH가 없어도 기본 이미지를 생성하여 처리합니다.
+    """
+    try:
+        # 기존 이미지 사용
+        base_image = Image.open(CANVAS_IMAGE_PATH)
+        if base_image.mode != 'RGBA':
+            base_image = base_image.convert('RGBA')
+        # 캔버스 크기에 맞게 리사이즈
+        if base_image.size != (500, 500):
+            base_image = base_image.resize((500, 500), Image.Resampling.LANCZOS)
+        print(f"캔버스 배경 이미지 로드: {CANVAS_IMAGE_PATH}")
+        
+        # 사용자 그림과 합성
+        image = overlay_png_and_np_from_image(base_image, numpy_array)
+        
+        # 파일 저장
+        current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        file_name = f"p-drawing-{current_time}"
+        file_path = f"src/draw_images/{file_name}.png"
+        
+        # 디렉토리가 존재하는지 확인하고 생성
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        image.save(file_path, format="PNG")
+        print(f"이미지 저장 완료: {file_path}")
+        return file_path
+        
+    except Exception as e:
+        st.error(f"이미지 저장 중 오류가 발생했습니다: {str(e)}")
+        return None
+
+
+def overlay_png_and_np_from_image(base_image, overlay_np, overlay_alpha=255):
+    """
+    PIL Image와 numpy array를 합성합니다.
+    """
+    from PIL import Image
+    import numpy as np
+    
+    # overlay_np를 RGBA로 변환
+    if overlay_np.shape[2] == 3:
+        # 불투명 알파 채널 추가
+        alpha = 255 * np.ones((overlay_np.shape[0], overlay_np.shape[1], 1), dtype=overlay_np.dtype)
+        overlay_np = np.concatenate([overlay_np, alpha], axis=-1)
+    overlay_img = Image.fromarray(overlay_np.astype('uint8'), 'RGBA')
+
+    # 크기 맞추기
+    if overlay_img.size != base_image.size:
+        overlay_img = overlay_img.resize(base_image.size, Image.Resampling.LANCZOS)
+
+    # overlay 드로잉 전체 투명도 조정
+    if overlay_alpha < 255:
+        r, g, b, a = overlay_img.split()
+        new_alpha = a.point(lambda p: overlay_alpha if p > 0 else 0)
+        overlay_img = Image.merge('RGBA', (r, g, b, new_alpha))
+
+    # 합성
+    return Image.alpha_composite(base_image, overlay_img)
 
 
 def save_draw_explanation(text):
@@ -157,12 +203,17 @@ with st.expander(
 st.text("문제의 답을 예상해보세요.")
 st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
 
-canvas_result = st_canvas(
+# 캔버스 이미지 미리 로딩
+with st.spinner("캔버스 이미지를 준비 중..."):
+    ensure_canvas_image_loaded(CANVAS_IMAGE_PATH, (500, 500))
+
+# 비동기 강제 이미지 로딩 캔버스 생성 (반드시 이미지 표시)
+canvas_result = create_async_canvas_with_guaranteed_image(
+    CANVAS_IMAGE_PATH,
     fill_color="rgba(255, 165, 0, 0.3)",  # Fixed fill color with some opacity
     stroke_width=3,
     stroke_color="#000000",
     background_color="#EEEEEE",
-    background_image=Image.open(CANVAS_IMAGE_PATH),
     update_streamlit=True,
     height=500,
     width=500,
@@ -196,7 +247,7 @@ if submit_button:
     st.session_state["predict_user_reason"] = reason
     st.session_state["predict_saved_image_path"] = saved_image_path
     st.session_state["submission_triggered"] = True  # 제출이 트리거되었음을 표시
-    st.success("좌측 사이드바의 **🤓AI 탐구도우미**의 피드백을 확인해주세요!")
+    st.success("좌측 사이드바의 **🤓AI 친구**의 피드백을 확인해주세요!")
     st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)")
 
 # Create columns with specific ratios
@@ -233,17 +284,20 @@ with st.sidebar:
     toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
     st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
-    st.text("AI와 대화하기")
+    st.write("**AI 친구**에게 물어보기")
     spinner_box = st.empty()
     messages = st.container(height=400)
 
-    selected_model = INQUIRY_ASSISTANT_OPENAI_MODEL
-    system_prompt = INQUIRY_ASSISTANT_02THINK_PROMPT
+    selected_model = "gpt-4.1"
+    system_prompt = PEER_AI_02THINK_PROMPT
 
     # 이전 대화를 출력
     def print_messages():
         for chat_message in st.session_state["messages_predict"]:
-            messages.chat_message(chat_message.role).write(chat_message.content)
+            if chat_message.role == "assistant":
+                messages.chat_message(chat_message.role, avatar=SIDEBAR_AI_AVATAR).write(chat_message.content)
+            else:
+                messages.chat_message(chat_message.role).write(chat_message.content)
 
     # 새로운 메시지를 추가
     def add_message(role, message):
@@ -251,20 +305,15 @@ with st.sidebar:
 
     # 초기 대화 기록 추가
     if len(st.session_state["messages_predict"]) == 0:
-        messages.chat_message("assistant").write("안녕하세요! 저는 AI 탐구도우미입니다. 무엇을 도와드릴까요?")
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("안녕! 나랑 같이 원운동을 탐구해보자!")
     else:
         pass
 
     # 이전 대화 기록 출력
     print_messages()
 
-    ##TODO 초기화 기능 구현
-    # # 초기화 버튼이 눌리면...
-    # if clear_btn:
-    #     st.session_state["messages"] = []
-
     # 사용자의 입력
-    user_input = st.chat_input("🤓AI 탐구도우미에게 궁금한 내용을 물어보세요!")
+    user_input = st.chat_input("궁금한 내용을 물어보세요!")
 
     ## 사용자 답변 제출에 대한 추가 로직(캔버스 사용 시)
     if st.session_state.get("submission_triggered", True) and "predict_saved_image_path" in st.session_state:
@@ -295,7 +344,7 @@ with st.sidebar:
                 )
                                         
                 # AI 답변을 스트리밍으로 표시
-                with messages.chat_message("assistant"):
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     feedback_container = st.empty()
                     ai_feedback = ""
                     
@@ -304,7 +353,7 @@ with st.sidebar:
                         feedback_container.markdown(ai_feedback)
                 
                 if response:
-                    st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
+                    st.success("🎉 AI 친구의 피드백을 확인해보세요!")
                     
                     # 대화 기록에 추가
                     add_message("user", f"(제출한 답변): {st.session_state['predict_user_reason']}")
@@ -339,98 +388,6 @@ with st.sidebar:
         kw_button_2 = None
 
 
-    # if st.session_state.get("toggle_recommended_questions", True) and kw_button_1:
-    #     user_input = kw_1
-
-        # # 비동기 처리
-        # with st.spinner("AI가 답변을 생성하고 있습니다..."):
-        #     loop = asyncio.new_event_loop()
-        #     asyncio.set_event_loop(loop)
-            
-        #     try:
-        #         # 이미지 파일을 처리
-        #         image_filepath = None
-        #         # 답변 요청 (비동기)
-        #         response = loop.run_until_complete(
-        #             generate_answer_async(image_filepath, system_prompt, user_input, selected_model)
-        #         )
-
-        #         # 사용자의 입력
-        #         messages.chat_message("user").write(user_input)
-
-        #         with messages.chat_message("assistant"):
-        #             # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-        #             container = st.empty()
-
-        #             ai_answer = ""
-        #             for token in response:
-        #                 ai_answer += token.content
-        #                 container.markdown(ai_answer)
-
-        #         if response:
-        #             st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
-        #             # 대화기록을 저장한다.
-        #             add_message("user", user_input)
-        #             add_message("assistant", ai_answer)
-        #         else:
-        #             st.error("AI 답변 생성에 실패했습니다.")
-
-            # if st.session_state.get("toggle_recommended_questions", True):
-                # kw_1, _ = create_keyword(st.session_state["messages_predict"])
-                # placeholder1.button(label=kw_1, use_container_width=True)
-                
-            # except Exception as e:
-            #     st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
-            # finally:
-            #     loop.close()
-
-
-    # if st.session_state.get("toggle_recommended_questions", True) and kw_button_2:
-    #     user_input = kw_2
-        
-        # # 비동기 처리
-        # with st.spinner("AI가 답변을 생성하고 있습니다..."):
-        #     loop = asyncio.new_event_loop()
-        #     asyncio.set_event_loop(loop)
-            
-        #     try:
-        #         # 이미지 파일을 처리
-        #         image_filepath = None
-        #         # 답변 요청 (비동기)
-        #         response = loop.run_until_complete(
-        #             generate_answer_async(image_filepath, system_prompt, user_input, selected_model)
-        #         )
-
-        #         # 사용자의 입력
-        #         messages.chat_message("user").write(user_input)
-
-        #         with messages.chat_message("assistant"):
-        #             # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-        #             container = st.empty()
-
-        #             ai_answer = ""
-        #             for token in response:
-        #                 ai_answer += token.content
-        #                 container.markdown(ai_answer)
-                
-        #         if response:
-        #             st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
-        #             # 대화기록을 저장한다.
-        #             add_message("user", user_input)
-        #             add_message("assistant", ai_answer)
-        #         else:
-        #             st.error("AI 답변 생성에 실패했습니다.")
-
-            # if st.session_state.get("toggle_recommended_questions", True):
-                # _, kw_2 = create_keyword(st.session_state["messages_predict"])
-                # placeholder2.button(label=kw_2, use_container_width=True)
-                
-            # except Exception as e:
-            #     st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
-            # finally:
-            #     loop.close()
-
-
     # 만약에 사용자 입력이 들어오면...
     if user_input and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", True)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", True)):
         # 비동기 처리
@@ -449,7 +406,7 @@ with st.sidebar:
                 # 사용자의 입력
                 messages.chat_message("user").write(user_input)
 
-                with messages.chat_message("assistant"):
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
                     container = st.empty()
 
@@ -459,7 +416,7 @@ with st.sidebar:
                         container.markdown(ai_answer)
 
                 if response:
-                    st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
+                    st.success("🎉 AI 친구의 피드백을 확인해보세요!")
                     # 대화기록을 저장한다.
                     add_message("user", user_input)
                     add_message("assistant", ai_answer)

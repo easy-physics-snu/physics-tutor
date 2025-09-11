@@ -16,8 +16,7 @@ def create_chain(prompt_filepath):
     prompt = load_prompt(prompt_filepath, encoding="utf-8")
 
     # GPT
-    #llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
-    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, api_key=st.session_state.api_key)
+    llm = ChatOpenAI(model_name="gpt-4.1-mini", temperature=0, api_key=st.session_state.api_key)
 
     # 출력 파서
     output_parser = StrOutputParser()

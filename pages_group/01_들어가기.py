@@ -23,6 +23,9 @@ TUTOR_OPENAI_MODEL = "gpt-4o"
 RAG_OPENAI_MODEL = "gpt-4o"
 RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
 
+AI_AVATAR = "src/images/ai_tutor_avatar.png"
+
+
 # 캐시 디렉토리 생성
 if not os.path.exists(".cache"):
     os.mkdir(".cache")
@@ -192,7 +195,7 @@ with tab2:
     # 문제와 답변 정의
     QUESTIONS = {
         'Q1': {
-            'question': "안녕하세요! 저는 오늘 여러분과 함께 공부할 🧑🏻‍🏫**AI 튜터**입니다. \n\n먼저 오늘 배운 기본 개념부터 다시 떠올려볼까요? \n\n공을 발로 찰 때처럼 한 사람이 힘을 작용하기도 하지만 줄다리기처럼 여러 사람이 함께 힘을 작용할 때도 있죠. **이처럼 한 물체에 여러 힘이 동시에 작용할 때, 이 힘들과 같은 효과를 나타내는 하나의 힘을 무엇이라고 할까요?** (초성 힌트: ㅇㅉㅎ 또는 ㅎㄹ)",
+            'question': "안녕하세요! 저는 오늘 여러분과 함께 공부할 **AI 선생님**입니다. \n\n먼저 오늘 배운 기본 개념부터 다시 떠올려볼까요? \n\n공을 발로 찰 때처럼 한 사람이 힘을 작용하기도 하지만 줄다리기처럼 여러 사람이 함께 힘을 작용할 때도 있죠. **이처럼 한 물체에 여러 힘이 동시에 작용할 때, 이 힘들과 같은 효과를 나타내는 하나의 힘을 무엇이라고 할까요?** (초성 힌트: ㅇㅉㅎ 또는 ㅎㄹ)",
             'answer_check': lambda x: any(phrase.lower() in x.lower() for phrase in ['알짜힘', '합력']),
             'correct_feedback': "정확합니다!  알짜힘(또는 합력)은 물체에 작용하는 모든 힘들을 하나로 합친 것이에요. 예를 들어, 줄다리기에서 양쪽에서 당기는 힘들을 모두 고려한 최종적인 힘이 바로 알짜힘(또는 합력)이죠. \n\n이제 뉴턴의 운동법칙에 대해 알아볼까요?",
             'hint': "실제로 영향을 주는 '알짜배기' 힘이라는 의미를 가지고 있답니다. 또는 여러 힘을 '합친다'는 의미가 담겨있기도 하구요."
@@ -261,7 +264,7 @@ with tab2:
             위 상황에서 학생에게 해줄 수 있는 격려와 도움이 되는 피드백을 제공해주세요."""
             
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1",
                 messages=[
                     {"role": "system", "content": TUTOR_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
@@ -272,7 +275,7 @@ with tab2:
             
             return response.choices[0].message.content
         except Exception as e:
-            st.error(f"AI 튜터 응답 생성 중 오류: {str(e)}")
+            st.error(f"AI 선생님 응답 생성 중 오류: {str(e)}")
             return "죄송합니다. 피드백을 생성하는 중에 오류가 발생했습니다. 다시 시도해주세요."
 
     def check_answer_with_score(user_answer, question_type):
@@ -334,10 +337,14 @@ with tab2:
     def display_chat_history():
         """대화 기록을 화면에 표시하는 함수"""
         for message in st.session_state.chat_history:
-            with chat_container.chat_message(message["role"]):
-                st.write(message["content"])
-                if "image" in message and message["image"]:  # 이미지가 있고 None이 아닐 때만 표시
-                    st.image(message["image"], use_container_width=True)
+            if message["role"] == "assistant":
+                with chat_container.chat_message(message["role"], avatar=AI_AVATAR):
+                    st.write(message["content"])
+            else:
+                with chat_container.chat_message(message["role"]):
+                    st.write(message["content"])
+            if "image" in message and message["image"]:  # 이미지가 있고 None이 아닐 때만 표시
+                st.image(message["image"], use_container_width=True)
 
     def process_answer(user_input):
         """답변을 처리하는 함수"""
@@ -532,7 +539,7 @@ with tab2:
             st.session_state.balloons_done = True
 
     # End 상태일 때는 입력창을 비활성화
-    placeholder = "🧑🏻‍🏫AI 튜터의 질문에 대한 답변을 작성해주세요." if not is_end else "복습이 완료되었습니다."
+    placeholder = "질문에 대한 답변을 작성해주세요." if not is_end else "복습이 완료되었습니다."
     if user_input := st.chat_input(placeholder, key="qa_chat_input", disabled=is_end):
         process_answer(user_input)
 

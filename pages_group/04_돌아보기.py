@@ -12,8 +12,8 @@ from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
-from modules.prompts import INQUIRY_ASSISTANT_04REFLECT_PROMPT
-from modules.utils import process_png_to_bytesio
+from modules.prompts import TUTOR_AI_04REFLECT_PROMPT
+from modules.utils import process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -42,7 +42,9 @@ CANVAS_IMAGE_PATH = "src/images/satellite_orbit_canvas.png"
 
 REVIEW_IMAGE_PATH = "src/images/review_1.png"
 
-INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4o-mini" 
+INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4.1" 
+
+SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
 
 if "submit_button_disabled" not in st.session_state:
     st.session_state["submit_button_disabled"] = True
@@ -59,12 +61,24 @@ if "explanation_multimodal_chain_with_history" not in st.session_state:
     st.session_state["explanation_multimodal_chain_with_history"] = None
 
 def save_draw_image(numpy_array):
-    image = Image.fromarray(numpy_array)
-    current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    file_name = f"e-drawing-{current_time}"
-    file_path = f"src/draw_images/{file_name}.png"
-    image.save(file_path, format="PNG")
-    return file_path
+    """
+    사용자 그림을 저장합니다.
+    """
+    try:
+        image = Image.fromarray(numpy_array)
+        current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        file_name = f"e-drawing-{current_time}"
+        file_path = f"src/draw_images/{file_name}.png"
+        
+        # 디렉토리가 존재하는지 확인하고 생성
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        image.save(file_path, format="PNG")
+        print(f"이미지 저장 완료: {file_path}")
+        return file_path
+    except Exception as e:
+        st.error(f"이미지 저장 중 오류가 발생했습니다: {str(e)}")
+        return None
 
 
 def enalble_submit_button():
@@ -75,12 +89,12 @@ def disalble_submit_button():
 
 
 # 비동기 체인 생성
-async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4o"):
+async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
     # 멀티모달 객체를 세션 상태에서 가져오거나 생성
     if st.session_state["explanation_multimodal_chain_with_history"] is None:
         # 객체 생성
         llm = ChatOpenAI(
-            temperature=0,
+            temperature=0.2,
             model_name=model_name,
             openai_api_key = st.session_state.api_key
         )
@@ -125,7 +139,7 @@ with left_col:
     message = """
 - 캔버스에 최종적으로 생각한 **(1)답안**과 그 **(2)이유**를 적어주세요.
 - 정답을 적으면 오른쪽 '문제 정답' 탭에 채점 결과와 피드백이 나옵니다.
-- 🧑🏻‍🏫**AI 튜터**와 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
+- 🧑🏻‍🏫**AI 선생님**과 대화하면서 오개념은 없는지 파악하고 내 이해도를 높여보세요.
 """
     st.info(message)
 
@@ -145,7 +159,7 @@ with right_col:
             }
             .tooltip-wrapper .tooltip-content {
                 visibility: hidden;
-                width: 600px;
+                width: 400px;
                 background-color: white;
                 color: black;
                 text-align: left;
@@ -209,15 +223,14 @@ with right_col:
         """, unsafe_allow_html=True)
 
     # Get user's previous answer and drawing from session state
-    user_drawing = st.session_state.get("predict_user_drawing", None)
+    user_drawing = st.session_state.get("predict_saved_image_path", None)
     user_reason = st.session_state.get("predict_user_reason", "이전 답안이 없습니다.")
     
-    # Convert numpy array to base64 image if it exists
+    # Convert saved image path to base64 image if it exists
     image_src = PROBLEM_IMAGE_PATH
     if user_drawing is not None:
-        
-        # Convert numpy array to PIL Image
-        img = Image.fromarray(user_drawing.astype('uint8'))
+        # Load image from saved file path
+        img = Image.open(user_drawing)
         
         # Convert PIL Image to base64
         buffered = io.BytesIO()
@@ -279,13 +292,19 @@ with tab1:
 
     st.text("최종적으로 문제를 해결해보세요.")
     st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
+    
+    # 캔버스 이미지 미리 로딩
+    with st.spinner("캔버스 이미지를 준비 중..."):
+        ensure_canvas_image_loaded(CANVAS_IMAGE_PATH, (500, 500))
+    
     # Create a canvas component
-    canvas_result = st_canvas(
+    # 비동기 강제 이미지 로딩 캔버스 생성 (반드시 이미지 표시)
+    canvas_result = create_async_canvas_with_guaranteed_image(
+        CANVAS_IMAGE_PATH,
         fill_color="rgba(255, 165, 0, 0.3)",  # Fixed fill color with some opacity
         stroke_width=3,
         stroke_color="#000000",
         background_color="#EEEEEE",
-        background_image=Image.open(CANVAS_IMAGE_PATH),
         update_streamlit=True,
         height=500,
         width=500,
@@ -362,7 +381,7 @@ with tab2:
 #####################################
 with st.sidebar:
 
-    st.text("AI와 대화하기")
+    st.write("**AI 선생님**과 대화하기")
     messages = st.container(height=400)
     ai_info = st.empty()
 
@@ -378,20 +397,28 @@ with st.sidebar:
             else:
                 pass
         else:
-            ai_info.info("내 답안을 제출하면 🧑🏻‍🏫AI 튜터와 대화가 시작됩니다!")
+            ai_info.info("내 답안을 제출하면 🧑🏻‍🏫AI 선생님과 대화가 시작됩니다!")
 
     # 모델 선택 메뉴
     selected_model = INQUIRY_ASSISTANT_OPENAI_MODEL
-    system_prompt = INQUIRY_ASSISTANT_04REFLECT_PROMPT
+    system_prompt = TUTOR_AI_04REFLECT_PROMPT
 
     # 이전 대화를 출력
     def print_messages():
         for chat_message in st.session_state["messages_explanation"]:
-            messages.chat_message(chat_message.role).write(chat_message.content)
+            if chat_message.role == "assistant":
+                messages.chat_message(chat_message.role, avatar=SIDEBAR_AI_AVATAR).write(chat_message.content)
+            else:
+                messages.chat_message(chat_message.role).write(chat_message.content)
 
     # 새로운 메시지를 추가
     def add_message(role, message):
         st.session_state["messages_explanation"].append(ChatMessage(role=role, content=message))
+
+    # 초기 질문 표시 (제출 전에만)
+    if len(st.session_state["messages_explanation"]) == 0:
+        # Display the question directly
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("앞서 보았던 문제를 다시 한 번 도전해볼까요?")
 
     # 이전 대화 기록 출력
     print_messages()
@@ -426,7 +453,7 @@ with st.sidebar:
                 )
                                         
                 # AI 답변을 스트리밍으로 표시
-                with messages.chat_message("assistant"):
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     feedback_container = st.empty()
                     ai_feedback = ""
                     
@@ -435,7 +462,7 @@ with st.sidebar:
                         feedback_container.markdown(ai_feedback)
                 
                 if response:
-                    st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
+                    st.success("🎉 AI 선생님의 피드백을 확인해보세요!")
                     
                     # 대화 기록에 추가
                     add_message("user", f"(제출한 답변): {st.session_state['explanation_user_reason']}")
@@ -452,44 +479,47 @@ with st.sidebar:
                 st.session_state["explanation_submission_in_progress"] = False
                 st.session_state["explanation_submission_triggered"] = False  # 트리거 상태 리셋
 
-        # 사용자의 입력
-        user_input = st.chat_input("🧑🏻‍🏫AI 튜터의 질문에 대한 답변을 작성해주세요.")
+    # 사용자의 입력 (답안 제출 후에만 표시)
+    if "explanation_saved_image_path" in st.session_state and "explanation_user_reason" in st.session_state:
+        user_input = st.chat_input("🧑🏻‍🏫AI 선생님의 질문에 대한 답변을 작성해주세요.")
+    else:
+        user_input = None
 
-        # 만약에 사용자 입력이 들어오면...
-        if user_input:
-            # 비동기 처리
-            with st.spinner("AI가 답변을 생성하고 있습니다..."):
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+    # 만약에 사용자 입력이 들어오면...
+    if user_input:
+        # 비동기 처리
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                # 답변 요청 (비동기)
+                response = loop.run_until_complete(
+                    generate_answer_async(None, system_prompt, user_input, selected_model)
+                )
+
+                # 사용자의 입력
+                messages.chat_message("user").write(user_input)
+
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
+                    # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+                    container = st.empty()
+
+                    ai_answer = ""
+                    for token in response:
+                        ai_answer += token.content
+                        container.markdown(ai_answer)
+
+                if response:
+                    st.success("🎉 AI 선생님의 피드백을 확인해보세요!")
+                    # 대화기록을 저장한다.
+                    add_message("user", user_input)
+                    add_message("assistant", ai_answer)
+                else:
+                    st.error("AI 답변 생성에 실패했습니다.")
                 
-                try:
-                    # 답변 요청 (비동기)
-                    response = loop.run_until_complete(
-                        generate_answer_async(None, system_prompt, user_input, selected_model)
-                    )
-
-                    # 사용자의 입력
-                    messages.chat_message("user").write(user_input)
-
-                    with messages.chat_message("assistant"):
-                        # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-                        container = st.empty()
-
-                        ai_answer = ""
-                        for token in response:
-                            ai_answer += token.content
-                            container.markdown(ai_answer)
-
-                    if response:
-                        st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
-                        # 대화기록을 저장한다.
-                        add_message("user", user_input)
-                        add_message("assistant", ai_answer)
-                    else:
-                        st.error("AI 답변 생성에 실패했습니다.")
-                    
-                except Exception as e:
-                    st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
-                finally:
-                    loop.close()
+            except Exception as e:
+                st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
+            finally:
+                loop.close()
 

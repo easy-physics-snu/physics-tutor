@@ -11,7 +11,8 @@ from langchain_openai import ChatOpenAI
 from modules.multimodal import MultiModalwithHistory
 from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
-from modules.prompts import INQUIRY_ASSISTANT_02THINK_PROMPT
+
+from modules.prompts import PEER_AI_02THINK_PROMPT
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -288,7 +289,7 @@ with st.sidebar:
     messages = st.container(height=400)
 
     selected_model = "gpt-4.1"
-    system_prompt = INQUIRY_ASSISTANT_02THINK_PROMPT
+    system_prompt = PEER_AI_02THINK_PROMPT
 
     # 이전 대화를 출력
     def print_messages():

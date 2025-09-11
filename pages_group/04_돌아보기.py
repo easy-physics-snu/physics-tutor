@@ -12,7 +12,7 @@ from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
-from modules.prompts import INQUIRY_ASSISTANT_04REFLECT_PROMPT
+from modules.prompts import TUTOR_AI_04REFLECT_PROMPT
 from modules.utils import process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
 st.session_state.api_key = st.secrets["openai_api_key"]
@@ -159,7 +159,7 @@ with right_col:
             }
             .tooltip-wrapper .tooltip-content {
                 visibility: hidden;
-                width: 600px;
+                width: 400px;
                 background-color: white;
                 color: black;
                 text-align: left;
@@ -401,7 +401,7 @@ with st.sidebar:
 
     # 모델 선택 메뉴
     selected_model = INQUIRY_ASSISTANT_OPENAI_MODEL
-    system_prompt = INQUIRY_ASSISTANT_04REFLECT_PROMPT
+    system_prompt = TUTOR_AI_04REFLECT_PROMPT
 
     # 이전 대화를 출력
     def print_messages():
@@ -479,44 +479,44 @@ with st.sidebar:
                 st.session_state["explanation_submission_in_progress"] = False
                 st.session_state["explanation_submission_triggered"] = False  # 트리거 상태 리셋
 
-        # 사용자의 입력
-        user_input = st.chat_input("🧑🏻‍🏫AI 선생님의 질문에 대한 답변을 작성해주세요.")
+    # 사용자의 입력 (답안 제출 여부와 관계없이 항상 처리)
+    user_input = st.chat_input("🧑🏻‍🏫AI 선생님의 질문에 대한 답변을 작성해주세요.")
 
-        # 만약에 사용자 입력이 들어오면...
-        if user_input:
-            # 비동기 처리
-            with st.spinner("AI가 답변을 생성하고 있습니다..."):
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+    # 만약에 사용자 입력이 들어오면...
+    if user_input:
+        # 비동기 처리
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                # 답변 요청 (비동기)
+                response = loop.run_until_complete(
+                    generate_answer_async(None, system_prompt, user_input, selected_model)
+                )
+
+                # 사용자의 입력
+                messages.chat_message("user").write(user_input)
+
+                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
+                    # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+                    container = st.empty()
+
+                    ai_answer = ""
+                    for token in response:
+                        ai_answer += token.content
+                        container.markdown(ai_answer)
+
+                if response:
+                    st.success("🎉 AI 선생님의 피드백을 확인해보세요!")
+                    # 대화기록을 저장한다.
+                    add_message("user", user_input)
+                    add_message("assistant", ai_answer)
+                else:
+                    st.error("AI 답변 생성에 실패했습니다.")
                 
-                try:
-                    # 답변 요청 (비동기)
-                    response = loop.run_until_complete(
-                        generate_answer_async(None, system_prompt, user_input, selected_model)
-                    )
-
-                    # 사용자의 입력
-                    messages.chat_message("user").write(user_input)
-
-                    with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
-                        # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-                        container = st.empty()
-
-                        ai_answer = ""
-                        for token in response:
-                            ai_answer += token.content
-                            container.markdown(ai_answer)
-
-                    if response:
-                        st.success("🎉 AI 탐구도우미의 피드백을 확인해보세요!")
-                        # 대화기록을 저장한다.
-                        add_message("user", user_input)
-                        add_message("assistant", ai_answer)
-                    else:
-                        st.error("AI 답변 생성에 실패했습니다.")
-                    
-                except Exception as e:
-                    st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
-                finally:
-                    loop.close()
+            except Exception as e:
+                st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
+            finally:
+                loop.close()
 

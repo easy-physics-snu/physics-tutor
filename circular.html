@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <title>원운동 알짜힘 방향 탐구</title>
   <style>
+    :root {
+      --app-font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Helvetica Neue", Arial, sans-serif;
+    }
+    body, button, input, label, #angleValue {
+      font-family: var(--app-font-stack);
+    }
     #container {
       display: flex;
       align-items: center;
@@ -25,7 +31,11 @@
   <div id="container">
     <canvas id="myP5Canvas" width="800" height="600" style="border:1px solid #ccc;"></canvas>
     <div id="sidebar">
-      <label for="angleSlider">힘의 각도 (도):</label>
+      <div style="margin-bottom: 10px; display: flex; gap: 6px; align-items: center;">
+        <input type="number" id="angleInput" min="-180" max="180" step="1" placeholder="-180~180" style="width: 80px;">
+        <button id="applyAngleBtn">각도 설정</button>
+      </div>
+      <label for="angleSlider">힘의 각도 (방향):</label>
       <input type="range" id="angleSlider" min="-180" max="180" value="0">
       <div id="angleValue">0° </div>
       <button id="resetBtn">초기화</button>
@@ -38,6 +48,8 @@
     const ctx = canvas.getContext('2d');
     const slider = document.getElementById('angleSlider');
     const angleValue = document.getElementById('angleValue');
+    const angleInput = document.getElementById('angleInput');
+    const applyAngleBtn = document.getElementById('applyAngleBtn');
     const resetBtn = document.getElementById('resetBtn');
     const stepBtn = document.getElementById('stepBtn');
     const runBtn = document.getElementById('runBtn');
@@ -88,7 +100,7 @@
       );
       ctx.stroke();
       // 라벨
-      ctx.font = '16px sans-serif';
+      ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Helvetica Neue", Arial, sans-serif';
       ctx.fillStyle = color;
       ctx.fillText(label, arrowX + 5, arrowY + 5);
     }
@@ -198,6 +210,7 @@
       // 현재 속도 방향을 기준으로 원하는 각도 차이만큼 힘 방향을 고정(앵커)
       forceDelta = parseInt(this.value, 10);
       forceAngle = (velocityAngle + forceDelta + 360) % 360;
+      if (angleInput) angleInput.value = forceDelta;
       //NEWNEWNEW
       if (Math.abs(forceDelta)===90) {
         lockedOrbitCenter = {
@@ -208,6 +221,22 @@
         lockedOrbitCenter = null;
       }
       draw();
+    });
+
+    function applyAngleFromInput() {
+      const val = parseInt(angleInput.value, 10);
+      if (isNaN(val)) return;
+      const clamped = Math.max(-180, Math.min(180, val));
+      if (clamped !== val) angleInput.value = clamped;
+      slider.value = clamped;
+      slider.dispatchEvent(new Event('input'));
+    }
+
+    applyAngleBtn.addEventListener('click', applyAngleFromInput);
+    angleInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        applyAngleFromInput();
+      }
     });
 
     function doStep() {
@@ -326,6 +355,7 @@
     posY = cy;
     trail = [{x: posX, y: posY}];
     slider.value = forceDelta;
+    angleInput.value = forceDelta;
     lockedOrbitCenter = null;
     // 초기에는 속도 방향에 대해 forceDelta만큼의 각도 차이를 갖도록 한 번만 앵커링
     forceAngle = (velocityAngle + forceDelta + 360) % 360;
@@ -362,6 +392,7 @@
       posY = cy;
       trail = [{x: posX, y: posY}];
       slider.value = forceDelta;
+      angleInput.value = forceDelta;
       // 초기에는 속도 방향에 대해 forceDelta만큼의 각도 차이를 갖도록 한 번만 앵커링
       forceAngle = (velocityAngle + forceDelta + 360) % 360;
       draw();

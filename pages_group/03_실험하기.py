@@ -104,8 +104,9 @@ with left_col:
     message = """
 - 앞에서 제출한 답을 떠올리며 시뮬레이션을 관찰하고 조작해보세요.
 - 시뮬레이션에 대해서 궁금한건 🤓**AI 친구**에게 물어보세요.
-- ⭐ **[내 실험실]에서는 내가 제출한 답을 시뮬레이션 해 볼 수 있어요** ⭐
 """
+#- ⭐ **[내 실험실]에서는 내가 제출한 답을 시뮬레이션 해 볼 수 있어요** ⭐
+
     st.info(message)
 
 with right_col:
@@ -235,20 +236,20 @@ with st.expander(
     expanded=True
     ):
     main_tab1 = st.container(border=True)
-    main_tab1.write("""무중력 상태의 우주 공간에 새로운 행성을 찾아 다니는 인공 위성이 있습니다. \n
-드디어! 새로운 행성을 발견한 인공 위성은 행성의 원형 궤도를 따라 일정한 속력으로 **등속 원운동**을 하기 위해 추진력의 방향을 조정 하려고 합니다. \n
-**인공 위성에 적용시켜야 하는 (1) 힘을 아래 캔버스에 원형궤도와 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에  적어봅시다. (그림은 오른쪽에 제시되어 있는 예시의 형태를 참고하여 그리기)**
+    main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 우주선이 있습니다.\n
+드디어! 새로운 행성을 발견한 우주선은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
+**이때, 우주선에 작용하는 (1) 알짜힘의 방향을 왼쪽의 캔버스에 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
 """)
     with main_tab1:
-        _, col2, col3, _ = st.columns(4, vertical_alignment='center')
+        _, col2, _ = st.columns(3, vertical_alignment='center')
         col2.image(
             image=MOON_IMAGE_PATH,
         )
-        col3.image(
-            image=PROBLEM_IMAGE_PATH,
-            caption="그림 작성 예시",
-            width=200
-        )
+        # col3.image(
+        #     image=PROBLEM_IMAGE_PATH,
+        #     caption="그림 작성 예시",
+        #     width=200
+        # )
 
 
 # 내 실험실 초기 세션 상태 설정
@@ -262,7 +263,7 @@ if 'last_input' not in st.session_state:
 ###################################
 with st.container(border=True):
 
-    st.subheader("물리 시뮬레이션 실험실")
+    st.markdown("<div style='font-size: 1.3rem; font-weight: 600; margin: 0 0 0px 0;'>물리 시뮬레이션 실험실</div>", unsafe_allow_html=True)
 
     # 로컬 HTML 파일 임베드
     try:
@@ -278,7 +279,9 @@ with st.container(border=True):
         </style>""", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"로컬 시뮬레이션을 불러오는 중 오류가 발생했습니다: {e}")
-
+    
+    # 커스텀 경계 박스 종료
+    st.markdown('</div>', unsafe_allow_html=True)
 
 #####################################
 ########### Sibebar Logic ###########

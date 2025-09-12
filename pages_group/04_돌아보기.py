@@ -40,7 +40,7 @@ PROBLEM_IMAGE_PATH = "src/images/satellite_orbit.png"
 MOON_IMAGE_PATH = "src/images/satellite_moon.png"
 CANVAS_IMAGE_PATH = "src/images/satellite_orbit_canvas.png"
 
-REVIEW_IMAGE_PATH = "src/images/review_1.png"
+REVIEW_IMAGE_PATH = "src/images/new_review_1.png"
 
 INQUIRY_ASSISTANT_OPENAI_MODEL = "gpt-4.1" 
 
@@ -274,21 +274,16 @@ with tab1:
         expanded=True
         ):
         main_tab1 = st.container(border=True)
-        main_tab1.write("""무중력 상태의 우주 공간에 새로운 행성을 찾아 다니는 인공 위성이 있습니다. \n
-드디어! 새로운 행성을 발견한 인공 위성은 행성의 원형 궤도를 따라 일정한 속력으로 **등속 원운동**을 하기 위해 추진력의 방향을 조정 하려고 합니다. \n
-**인공 위성에 적용시켜야 하는 (1) 힘을 아래 캔버스에 원형궤도와 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에  적어봅시다. (그림은 오른쪽에 제시되어 있는 예시의 형태를 참고하여 그리기)**
+        main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 우주선이 있습니다.\n
+드디어! 새로운 행성을 발견한 우주선은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
+**이때, 우주선에 작용하는 (1) 알짜힘의 방향을 왼쪽의 캔버스에 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
 """)
         with main_tab1:
-            _, col2, col3, _ = st.columns(4, vertical_alignment='center')
+            _, col2, _ = st.columns(3, vertical_alignment='center')
             col2.image(
                 image=MOON_IMAGE_PATH,
             )
-            col3.image(
-                image=PROBLEM_IMAGE_PATH,
-                caption="그림 작성 예시",
-                width=200
-            )
-
+           
 
     st.text("최종적으로 문제를 해결해보세요.")
     st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")

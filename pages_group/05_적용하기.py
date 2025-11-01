@@ -204,7 +204,7 @@ if not st.session_state.get("show_resources", False):
             st.session_state["feedback_processed"] = False  # 피드백 처리 플래그 리셋
             st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1  # text_area 키 변경
             st.session_state["last_submission_time"] = current_time  # 제출 시간 기록
-            st.success("제출 완료! 오른쪽 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
+            st.success("제출 완료! 좌측 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
 
 # 메인 하단 리소스 섹션
 if st.session_state.get("show_resources", False):

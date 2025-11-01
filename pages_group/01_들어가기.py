@@ -17,11 +17,11 @@ os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
-TEXTBOOK_FILE_PATH = "src/textbooks/physics_textbook.pdf"
+# TEXTBOOK_FILE_PATH = "src/textbooks/physics_textbook.pdf" #제거할 예정
 
-TUTOR_OPENAI_MODEL = "gpt-4o"
-RAG_OPENAI_MODEL = "gpt-4o"
-RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
+TUTOR_OPENAI_MODEL = "gpt-4.1-mini"
+# RAG_OPENAI_MODEL = "gpt-4o"
+# RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
 
 AI_AVATAR = "src/images/ai_tutor_avatar.png"
 
@@ -56,24 +56,24 @@ if "balloons_done" not in st.session_state:
     st.session_state["balloons_done"] = False
 
 
-# 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
-if "pdf_retriever" not in st.session_state:
-    retriever = embed_file(TEXTBOOK_FILE_PATH)
-    st.session_state["pdf_retriever"] = retriever
+# # 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
+# if "pdf_retriever" not in st.session_state:
+#     retriever = embed_file(TEXTBOOK_FILE_PATH)
+#     st.session_state["pdf_retriever"] = retriever
 
-if "pdf_chain" not in st.session_state and st.session_state["pdf_retriever"]:
-    retriever = st.session_state["pdf_retriever"]
-    st.session_state["pdf_chain"] = create_chain(
-        retriever, prompt_path=RAG_SYSTEM_PROMPT, model_name=RAG_OPENAI_MODEL
-    )
+# if "pdf_chain" not in st.session_state and st.session_state["pdf_retriever"]:
+#     retriever = st.session_state["pdf_retriever"]
+#     st.session_state["pdf_chain"] = create_chain(
+#         retriever, prompt_path=RAG_SYSTEM_PROMPT, model_name=RAG_OPENAI_MODEL
+#     )
 
 ######################################
 ########### Mainpage Logic ###########
 ######################################
 st.title("들어가기 🚀")
 
-st.subheader("오늘 배운 물리 개념은?")
-st.info("- 먼저 **[1. 여러 가지 운동]** 과 **[2. 힘과 운동]** 소단원에서 배운 내용을 복습해봅시다:) \n - 궁금한게 있으면 왼쪽 사이드바의 **교과서 찾기**를 활용해보세요. \n - 아래 2개 탭을 모두 마치고 다음 단계로 넘어가주세요!")
+st.subheader("오늘 배울 물리 개념은?")
+st.info("- 먼저 **[1. 여러 가지 운동]** 과 **[2. 힘과 운동]** 소단원에서 배운 내용을 복습해봅시다:) \n - 아래 2개 탭을 모두 마치고 다음 단계로 넘어가주세요!")
 
 st.image("src/images/find_tab_guide.png", width=500)
 
@@ -187,94 +187,118 @@ with tab2:
 
     다음 지침을 따라주세요:
     1. 학생이 이해한 부분과 부족한 부분을 파악합니다.
-    2. 부족한 부분에 대해 다시 작성할 수 있도록 유도하는 피드백을 제공합니다.
-    3. 절대로 정답에 가까운 내용을 제공하지 마세요.
-    4. 세 문장을 넘지 않도록 대화를 생성하세요.  
-    5. 이모지를 적절히 사용하여 친근감을 줍니다"""
+    2. 부족한 부분에 대해 다시 생각해볼 수 있도록 질문이나 힌트를 제공합니다.
+    3. ⚠️ **절대 금지**: 정답을 직접 말하거나, 정답 예시를 언급하거나, 정확한 답을 암시하지 마세요.
+    4. 학생이 장난스럽거나 부적절한 답변을 하더라도, 교육자로서 차분하고 친절하게 진지한 답변을 권유하세요.
+    5. 세 문장을 넘지 않도록 간결하게 대화를 생성하세요.  
+    6. 이모지를 적절히 사용하여 친근감을 줍니다."""
 
     # 문제와 답변 정의
     QUESTIONS = {
         'Q1': {
             'question': "안녕하세요! 저는 오늘 여러분과 함께 공부할 **AI 선생님**입니다. \n\n먼저 오늘 배운 기본 개념부터 다시 떠올려볼까요? \n\n공을 발로 찰 때처럼 한 사람이 힘을 작용하기도 하지만 줄다리기처럼 여러 사람이 함께 힘을 작용할 때도 있죠. **이처럼 한 물체에 여러 힘이 동시에 작용할 때, 이 힘들과 같은 효과를 나타내는 하나의 힘을 무엇이라고 할까요?** (초성 힌트: ㅇㅉㅎ 또는 ㅎㄹ)",
-            'answer_check': lambda x: any(phrase.lower() in x.lower() for phrase in ['알짜힘', '합력']),
-            'correct_feedback': "정확합니다!  알짜힘(또는 합력)은 물체에 작용하는 모든 힘들을 하나로 합친 것이에요. 예를 들어, 줄다리기에서 양쪽에서 당기는 힘들을 모두 고려한 최종적인 힘이 바로 알짜힘(또는 합력)이죠. \n\n이제 뉴턴의 운동법칙에 대해 알아볼까요?",
+            'correct_answers': ['알짜힘', '합력'],
+            'correct_feedback': "정확합니다!  알짜힘(또는 합력)은 물체에 작용하는 모든 힘들을 하나로 합친 것이에요. 예를 들어, 줄다리기에서 양쪽에서 당기는 힘들을 모두 고려한 최종적인 힘이 바로 알짜힘(또는 합력)이죠.",
             'hint': "실제로 영향을 주는 '알짜배기' 힘이라는 의미를 가지고 있답니다. 또는 여러 힘을 '합친다'는 의미가 담겨있기도 하구요."
         },
         'Q2': {
-            'question': "이제 뉴턴의 운동법칙에 대해 알아볼까요? \n\n**다음 키워드를 모두 사용해서 뉴턴 운동 제1법칙을 설명해주세요:**\n[물체, 알짜힘, 운동 상태]",
-            'answer_check': lambda x: any(phrase.lower() in x.lower() for phrase in [
+            'question': "이제 뉴턴의 운동법칙에 대해 알아볼까요? \n\n**다음 키워드를 참고하여 뉴턴 운동 제1법칙을 설명해주세요:**\n[물체, 알짜힘, 운동 상태]",
+            'correct_answers': [
                 "물체에 작용하는 알짜힘이 0일 때, 물체의 운동 상태가 변하지 않는다",
                 "물체에 작용하는 알짜힘이 0이면 물체는 원래의 운동 상태를 유지한다",
-                "물체에 작용하는 알짜힘이 0일 때, 물체의 원래의 운동 상태를 유지한다",
-                "물체에 알짜힘이 작용하지 않으면, 물체는 원래 하고 있던 운동 상태를 그대로 유지한다.",
-                "물체는 알짜힘이 0일 때, 현재의 운동 상태를 바꾸지 않고 계속 유지한다.",
-                "정지해 있던 물체는 계속 정지하고, 운동 중인 물체는 알짜힘이 없을 때 등속 직선 운동을 한다.",
-                "물체에 작용하는 알짜힘이 없다면, 물체는 관성에 의해 현재의 운동 상태를 그대로 유지하려 한다.",
+                "물체에 작용하는 알짜힘이 0일 때, 물체는 원래의 운동 상태를 유지한다",
+                "물체에 알짜힘이 작용하지 않으면, 물체는 원래 하고 있던 운동 상태를 그대로 유지한다",
+                "물체는 알짜힘이 0일 때, 현재의 운동 상태를 바꾸지 않고 계속 유지한다",
+                "정지해 있던 물체는 계속 정지하고, 운동 중인 물체는 알짜힘이 없을 때 등속 직선 운동을 한다",
+                "물체에 작용하는 알짜힘이 없다면, 물체는 관성에 의해 현재의 운동 상태를 그대로 유지하려 한다",
                 "물체에 작용하는 알짜힘이 0일 때, 정지해 있는 물체는 계속 정지해 있고, 운동 중인 물체는 계속해서 등속도 운동을 한다",
                 "물체에 작용하는 알짜힘이 0일 때, 물체가 현재의 운동 상태를 유지하려는 관성을 갖는다",
-            ]),
+                "물체에 알짜힘이 작용하지 않으면 정지 또는 등속도 운동을 한다",
+                "물체에 알짜힘이 없을 때 운동상태는 정지 또는 등속도 운동이다"
+            ],
             'correct_feedback': "정말 잘 설명했어요!  \n\n뉴턴 제1법칙은 '관성의 법칙'이라고도 불러요. 물체가 현재 상태를 유지하려는 성질을 '관성'이라고 하죠.",
-            'hint': "알짜힘이 0일 때 물체는 어떻게 될까요? 물체의 운동 상태가 어떻게 변할지(또는 변하지 않을지) 생각해보세요."
+            'hint': "알짜힘이 0일 때 물체는 어떻게 될까요? 물체의 운동 상태가 어떻게 변할지(또는 변하지 않을지) 생각해보세요.",
+            'evaluation_note': "** 중요 평가 지침: '운동 상태'라는 키워드 자체는 필수가 아닙니다. 대신 '정지', '등속도', '등속 직선 운동' 같은 구체적인 운동 상태를 설명하면 정답으로 인정합니다."
         },
         'Q3': {
-            'question': "마지막으로 뉴턴 운동 제2법칙입니다! \n\n**다음 키워드를 모두 사용해서 뉴턴 운동 제2법칙을 설명해주세요:**\n[물체, 알짜힘, 가속도, 질량]",
-            'answer_check': lambda x: any(phrase.lower() in x.lower() for phrase in [
+            'question': "마지막으로 뉴턴 운동 제2법칙입니다! \n\n**다음 키워드를 참고하여 뉴턴 운동 제2법칙을 설명해주세요:**\n[물체, 알짜힘, 가속도, 질량]",
+            'correct_answers': [
                 "물체에 작용하는 알짜힘이 클수록 가속도가 크고, 물체의 질량이 클수록 가속도가 작아진다",
                 "물체에 작용하는 알짜힘은 물체의 질량과 가속도의 곱과 같다",
+                "물체에 작용하는 알짜힘은 가속도와 물체의 질량에 비례한다",
+                "물체에 작용하는 알짜힘은 가속도에 비례하고 질량에 비례한다",
                 "물체의 가속도는 작용하는 알짜힘에 비례하고 질량에 반비례한다",
-                "물체에 작용하는 알짜힘은 물체를 가속시키며, 그 크기는 질량과 가속도의 곱으로 나타낼 수 있다.",
-                "물체의 가속도는 알짜힘에 비례하고 질량에 반비례한다. 즉, 힘이 크면 가속도도 커지고, 질량이 크면 가속도는 작아진다.",
-                "물체에 알짜힘이 작용하면, 물체는 질량에 반비례하는 크기의 가속도를 얻는다.",
-                "물체의 운동 상태가 변하는 정도, 즉 가속도는 알짜힘의 크기에 비례하고, 물체의 질량에 따라 그 크기가 달라진다.",
-            ]),
-            'correct_feedback': "완벽한 설명입니다!  \n\n수식으로 표현하면 F = ma가 되죠. 같은 힘을 작용해도 질량이 큰 물체는 작은 가속도로, 질량이 작은 물체는 큰 가속도로 운동하게 됩니다.",
-            'hint': "알짜힘과 가속도는 어떤 관계가 있을까요? 그리고 질량이 커지면 가속도는 어떻게 될까요? 이 관계를 모두 포함해서 설명해보세요."
+                "물체에 작용하는 알짜힘은 물체를 가속시키며, 그 크기는 질량과 가속도의 곱으로 나타낼 수 있다",
+                "물체의 가속도는 알짜힘에 비례하고 질량에 반비례한다. 즉, 힘이 크면 가속도도 커지고, 질량이 크면 가속도는 작아진다",
+                "물체에 알짜힘이 작용하면, 물체는 질량에 반비례하는 크기의 가속도를 얻는다",
+                "물체의 운동 상태가 변하는 정도, 즉 가속도는 알짜힘의 크기에 비례하고, 물체의 질량에 따라 그 크기가 달라진다",
+                "물체의 속도가 변하는 정도, 즉 가속도는 알짜힘의 크기에 비례하고 물체의 질량에 반비례한다"
+            ],
+            'correct_feedback': "잘했습니다!  \n\n수식으로 표현하면 F = ma가 되죠. 같은 힘을 작용해도 질량이 큰 물체는 작은 가속도로, 질량이 작은 물체는 큰 가속도로 운동하게 됩니다.",
+            'hint': "알짜힘과 가속도는 어떤 관계가 있을까요? 그리고 질량이 커지면 가속도는 어떻게 될까요? 이 관계를 모두 포함해서 설명해보세요.",
+            'evaluation_note': """** 중요 평가 지침: 
+1. '물체'라는 키워드 자체는 필수가 아닙니다.
+2. 뉴턴 제2법칙의 핵심은 '가속도가 어떻게 결정되는가'입니다.
+3. "알짜힘은 가속도와 질량에 비례한다" 또는 "F=ma"는 수식적으로는 맞지만, 가속도를 주어로 설명하지 않았습니다.
+   → 이 경우 "부분적으로 맞지만 불완전하다"고 판정하고, "F=ma를 잘 설명했네요! 그런데 뉴턴 제2법칙은 가속도가 어떻게 결정되는지를 설명하는 법칙이에요. 가속도 입장에서 다시 생각해볼까요?"와 같이 피드백하세요."""
         },
         'End': {
             'question': "수고하셨습니다! 이제 다음 단계로 넘어갈 준비가 되었습니다.",
-            'answer': None,
             'correct_feedback': None,
             'is_end': True
         }
     }
 
-    def is_similar_answer(user_input, correct_answer):
-        """오타를 허용하는 답변 체크 함수"""
-        # 공백 제거 및 소문자 변환
-        user_input = ''.join(user_input.lower().split())
-        correct_answer = ''.join(correct_answer.lower().split())
-        
-        # 완전히 같으면 True
-        if user_input == correct_answer:
-            return True
-        
-        # 길이가 비슷하고 대부분의 글자가 일치하면 True
-        if abs(len(user_input) - len(correct_answer)) <= 1:
-            matches = sum(1 for a, b in zip(user_input, correct_answer) if a == b)
-            return matches >= len(correct_answer) - 1
-        
-        return False
-
-    def get_tutor_response(user_answer, question_type, is_correct):
-        """AI 튜터의 응답을 생성하는 함수"""
+    def evaluate_answer_with_llm(user_answer, question_type):
+        """LLM을 사용하여 학생 답변을 평가하는 함수"""
         try:
             client = OpenAI(api_key=st.session_state.api_key)
             current_q = QUESTIONS[question_type]
             
-            if is_correct:
-                return current_q['correct_feedback']
+            # 정답 예시 목록 가져오기
+            if 'correct_answers' in current_q:
+                correct_answers_text = "\n".join([f"- {ans}" for ans in current_q['correct_answers']])
+            else:
+                correct_answers_text = "정답 기준이 설정되지 않았습니다."
             
-            # 오답일 경우 AI 튜터의 맞춤형 피드백 생성
-            prompt = f"""학생이 다음 문제에 대해 틀린 답변을 했습니다:
-            문제: {current_q['question']}
-            학생 답변: {user_answer}
+            # 힌트 가져오기
+            hint_text = current_q.get('hint', '')
+            hint_section = f"\n\n힌트: {hint_text}" if hint_text else ""
             
-            힌트: {current_q.get('hint', '힌트를 참고하세요.')}
+            # 특별 평가 지침 가져오기
+            evaluation_note = current_q.get('evaluation_note', '')
+            evaluation_note_section = f"\n\n{evaluation_note}" if evaluation_note else ""
             
-            위 상황에서 학생에게 해줄 수 있는 격려와 도움이 되는 피드백을 제공해주세요."""
-            
+            prompt = f"""당신은 물리 교육 평가 전문가입니다. 학생의 답변이 정답으로 인정될 수 있는지 평가해주세요.
+
+문제: {current_q['question']}
+
+정답으로 인정 가능한 답변 예시들:
+{correct_answers_text}{hint_section}{evaluation_note_section}
+
+학생 답변: {user_answer}
+
+평가 기준:
+1. 학생 답변이 물리적으로 올바른 개념을 포함하는가?
+2. 정답 예시들과 의미적으로 동일하거나 유사한가?
+3. 학생 답변이 키워드를 적절하게 포함하고 있는가?
+
+피드백 작성 규칙 (학생 답변을 고려하여 상황에 맞게):
+- 정답이면: 칭찬해주세요
+- 오답이면: 
+  ⚠️ **절대 금지**: 정답을 직접 말하거나, 정답 예시를 인용하거나, 정확한 답을 암시하지 마세요
+  ✅ **반드시 할 것**: 
+    1) 학생이 쓴 답변의 어느 부분이 부족한지 구체적으로 짚어주세요
+    2) 학생이 다시 생각해볼 수 있도록 질문 형태로 유도하세요
+    3) 힌트는 참고만 하고, 힌트를 그대로 반복하지 마세요
+  ✅ 학생이 장난스러운 답변을 했다면, 친절하게 진지하게 답변할 것을 권유하세요
+
+다음 형식으로만 답변해주세요:
+판정: [정답/오답]
+피드백: [세 문장 이내로 작성]"""
+
             response = client.chat.completions.create(
-                model="gpt-4.1",
+                model=TUTOR_OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": TUTOR_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
@@ -283,59 +307,20 @@ with tab2:
                 max_tokens=200
             )
             
-            return response.choices[0].message.content
+            evaluation = response.choices[0].message.content
+            
+            # 판정 결과 추출
+            is_correct = "정답" in evaluation.split("\n")[0]
+            
+            # 피드백 추출
+            feedback_lines = evaluation.split("\n")
+            feedback = "\n".join(feedback_lines[1:]).replace("피드백:", "").strip()
+            
+            return is_correct, feedback
+            
         except Exception as e:
-            st.error(f"AI 선생님 응답 생성 중 오류: {str(e)}")
-            return "죄송합니다. 피드백을 생성하는 중에 오류가 발생했습니다. 다시 시도해주세요."
-
-    def check_answer_with_score(user_answer, question_type):
-        """답변의 점수를 평가하는 함수"""
-        client = OpenAI(api_key=st.session_state.api_key)
-        current_q = QUESTIONS[question_type]
-        
-        prompt = f"""다음은 물리 문제와 학생의 답변입니다:
-
-            문제: {current_q['question']}
-            학생 답변: {user_answer}
-
-            답변을 평가하고 점수(0-100)와 피드백을 제공해주세요. 다음 기준을 참고하세요:
-            1. 키워드의 적절한 사용 (40점)
-            2. 개념의 정확한 설명 (40점)
-            3. 답변의 완성도 (20점)
-
-            응답 형식:
-            점수: [0-100의 숫자]
-            피드백: [구체적인 피드백]"""
-
-        response = client.chat.completions.create(
-            model=TUTOR_OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": TUTOR_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,
-            max_tokens=200
-        )
-        
-        feedback = response.choices[0].message.content
-        
-        # 정규식을 사용하여 점수 추출
-        score_match = re.search(r'점수:\s*(\d+)', feedback)
-        if score_match:
-            score = int(score_match.group(1))
-        else:
-            score = 0
-        
-        return score, feedback
-
-    def check_answer(user_answer, question_data):
-        """정답 여부를 확인하는 함수"""
-        if 'answer' in question_data:
-            return is_similar_answer(user_answer, question_data['answer'])
-        elif 'answer_check' in question_data:
-            return question_data['answer_check'](user_answer)
-        else:
-            return False
+            st.error(f"답변 평가 중 오류: {str(e)}")
+            return False, "평가 중 오류가 발생했습니다."
 
     def add_message_to_history(role, content, image_path=None):
         """대화 내용을 히스토리에 추가하는 함수"""
@@ -350,12 +335,16 @@ with tab2:
             if message["role"] == "assistant":
                 with chat_container.chat_message(message["role"], avatar=AI_AVATAR):
                     st.write(message["content"])
+                    # 이미지가 있으면 메시지 바로 아래에 표시
+                    if "image" in message and message["image"]:
+                        with st.popover("📖 교과서 본문", use_container_width=True):
+                            # Q3 이미지(explain_5.png)일 때만 스크롤 안내 표시
+                            if "explain_5.png" in message["image"]:
+                                st.caption("💡 아래로 스크롤하여 전체 내용을 확인하세요 ⬇️")
+                            st.image(message["image"], use_container_width=True)
             else:
                 with chat_container.chat_message(message["role"]):
                     st.write(message["content"])
-            if "image" in message and message["image"]:  # 이미지가 있고 None이 아닐 때만 표시
-                with st.popover("교과서 본문"):
-                    st.image(message["image"], use_container_width=True)
 
     def process_answer(user_input):
         """답변을 처리하는 함수"""
@@ -372,82 +361,35 @@ with tab2:
         with status_container:
             st.info("🤔 AI가 답변을 생성중입니다...")
             
-        # AI 응답 생성
-        if 'answer' in current_q:
-            is_correct = is_similar_answer(user_input, current_q['answer'])
-            if is_correct:
-                feedback = current_q['correct_feedback']
-                
-                # 정답일 때 이미지와 함께 피드백 추가
-                image_path = None
-                if st.session_state.current_question == 'Q2':
-                    image_path = "src/images/explain_4.png"
-                elif st.session_state.current_question == 'Q3':
-                    image_path = "src/images/explain_5.png"
-                
-                add_message_to_history("assistant", feedback, image_path)
-                
-                # 다음 문제로 이동
-                next_questions = {'Q1': 'Q2', 'Q2': 'Q3', 'Q3': 'End'}
-                next_q = next_questions[st.session_state.current_question]
-                
-                if next_q:
-                    st.session_state.current_question = next_q
-                    if next_q != 'End':
-                        add_message_to_history("assistant", QUESTIONS[next_q]['question'])
-                    else:
-                        add_message_to_history("assistant", QUESTIONS['End']['question'])
-            else:
-                # 오답일 경우 AI 튜터의 맞춤형 피드백 생성
-                feedback = get_tutor_response(user_input, st.session_state.current_question, False)
-                add_message_to_history("assistant", feedback)
-        elif 'answer_check' in current_q:
-            # answer_check 함수를 사용하는 경우 (Q1, Q2, Q3)
-            is_correct = current_q['answer_check'](user_input)
-            if is_correct:
-                feedback = current_q['correct_feedback']
-                
-                # 정답일 때 이미지와 함께 피드백 추가
-                image_path = None
-                if st.session_state.current_question == 'Q2':
-                    image_path = "src/images/explain_4.png"
-                elif st.session_state.current_question == 'Q3':
-                    image_path = "src/images/explain_5.png"
-                
-                add_message_to_history("assistant", feedback, image_path)
-                
-                # 다음 문제로 이동
-                next_questions = {'Q1': 'Q2', 'Q2': 'Q3', 'Q3': 'End'}
-                next_q = next_questions[st.session_state.current_question]
-                
-                if next_q:
-                    st.session_state.current_question = next_q
-                    if next_q != 'End':
-                        add_message_to_history("assistant", QUESTIONS[next_q]['question'])
-                    else:
-                        add_message_to_history("assistant", QUESTIONS['End']['question'])
-            else:
-                # 오답일 경우 AI 튜터의 맞춤형 피드백 생성
-                feedback = get_tutor_response(user_input, st.session_state.current_question, False)
-                add_message_to_history("assistant", feedback)
+        # LLM을 사용한 답변 평가 (정오답 판정 + 피드백을 한 번에 받음)
+        is_correct, ai_feedback = evaluate_answer_with_llm(user_input, st.session_state.current_question)
+        
+        if is_correct:
+            # 정답인 경우 - 미리 정의된 상세한 피드백 사용
+            feedback = current_q['correct_feedback']
+            
+            # 정답일 때 이미지와 함께 피드백 추가
+            image_path = None
+            if st.session_state.current_question == 'Q2':
+                image_path = "src/images/explain_4.png"
+            elif st.session_state.current_question == 'Q3':
+                image_path = "src/images/explain_5.png"
+            
+            add_message_to_history("assistant", feedback, image_path)
+            
+            # 다음 문제로 이동
+            next_questions = {'Q1': 'Q2', 'Q2': 'Q3', 'Q3': 'End'}
+            next_q = next_questions[st.session_state.current_question]
+            
+            if next_q:
+                st.session_state.current_question = next_q
+                if next_q != 'End':
+                    add_message_to_history("assistant", QUESTIONS[next_q]['question'])
+                else:
+                    add_message_to_history("assistant", QUESTIONS['End']['question'])
         else:
-            if st.session_state.current_question in ['Q2', 'Q3']:
-                score, feedback = check_answer_with_score(user_input, st.session_state.current_question)
-                add_message_to_history("assistant", feedback)
-                
-                if score >= 70:
-                    # 이미지와 함께 다음 문제로 이동
-                    if st.session_state.current_question == 'Q2':
-                        image_path = "src/images/explain_4.png"
-                        add_message_to_history("assistant", "", image_path)
-                        next_q = 'Q3'
-                        st.session_state.current_question = next_q
-                        add_message_to_history("assistant", QUESTIONS[next_q]['question'])
-                    elif st.session_state.current_question == 'Q3':
-                        image_path = "src/images/explain_5.png"
-                        add_message_to_history("assistant", "", image_path)
-                        st.session_state.current_question = 'End'
-                        add_message_to_history("assistant", QUESTIONS['End']['question'])
+            # 오답인 경우 - LLM이 생성한 맞춤형 피드백 사용 (힌트 포함)
+            add_message_to_history("assistant", ai_feedback)
 
         # 상태 메시지 제거
         status_container.empty()
@@ -570,48 +512,48 @@ with tab2:
 #####################################
 ########### Sibebar Logic ###########
 #####################################
-with st.sidebar:
+# with st.sidebar:
 
-    st.write("⏬ 혼자서 문제 풀기 너무 어렵다면? ⏬")
+#     st.write("⏬ 혼자서 문제 풀기 너무 어렵다면? ⏬")
 
-    toggle_ai_helper = st.toggle("**교과서 찾기** 사용하기", value=False)
+#     toggle_ai_helper = st.toggle("**교과서 찾기** 사용하기", value=False)
 
-    if toggle_ai_helper:
+#     if toggle_ai_helper:
 
-        st.warning("단, 스스로 충분히 고민해도 정말 모르겠을 때 사용하기!")
+#         st.warning("단, 스스로 충분히 고민해도 정말 모르겠을 때 사용하기!")
 
-        st.text("교과서와 '대화'해봅시다")
-        messages = st.container(height=300)
+#         st.text("교과서와 '대화'해봅시다")
+#         messages = st.container(height=300)
             
-        def print_messages():
-            for chat_message in st.session_state["intro_1_tutor_messages"]:
-                messages.chat_message(chat_message.role).write(chat_message.content)
+#         def print_messages():
+#             for chat_message in st.session_state["intro_1_tutor_messages"]:
+#                 messages.chat_message(chat_message.role).write(chat_message.content)
 
-        # 새로운 메시지를 추가
-        def add_message(role, message):
-            st.session_state["intro_1_tutor_messages"].append(ChatMessage(role=role, content=message))
+#         # 새로운 메시지를 추가
+#         def add_message(role, message):
+#             st.session_state["intro_1_tutor_messages"].append(ChatMessage(role=role, content=message))
 
-        # 이전 대화 기록 출력
-        print_messages()
+#         # 이전 대화 기록 출력
+#         print_messages()
 
-        if user_input := st.chat_input("궁금한 내용을 물어보세요!", key="pdf_chat_input"):
+#         if user_input := st.chat_input("궁금한 내용을 물어보세요!", key="pdf_chat_input"):
 
-            chain = st.session_state["pdf_chain"]
+#             chain = st.session_state["pdf_chain"]
 
-            if chain is not None:
-                # 사용자의 입력
-                messages.chat_message("user").write(user_input)
-                # 스트리밍 호출
-                response = chain.stream(user_input)
-                with messages.chat_message("assistant"):
-                    # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-                    container = st.empty()
+#             if chain is not None:
+#                 # 사용자의 입력
+#                 messages.chat_message("user").write(user_input)
+#                 # 스트리밍 호출
+#                 response = chain.stream(user_input)
+#                 with messages.chat_message("assistant"):
+#                     # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+#                     container = st.empty()
 
-                    ai_answer = ""
-                    for token in response:
-                        ai_answer += token
-                        container.markdown(ai_answer)
+#                     ai_answer = ""
+#                     for token in response:
+#                         ai_answer += token
+#                         container.markdown(ai_answer)
 
-                # 대화기록을 저장한다.
-                add_message("user", user_input)
-                add_message("assistant", ai_answer)
+#                 # 대화기록을 저장한다.
+#                 add_message("user", user_input)
+#                 add_message("assistant", ai_answer)

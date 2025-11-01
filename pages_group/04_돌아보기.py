@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
 from modules.prompts import TUTOR_AI_04REFLECT_PROMPT
-from modules.utils import process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
+from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -60,12 +60,26 @@ if "show_answer" not in st.session_state:
 if "explanation_multimodal_chain_with_history" not in st.session_state:
     st.session_state["explanation_multimodal_chain_with_history"] = None
 
+
 def save_draw_image(numpy_array):
     """
-    사용자 그림을 저장합니다.
+    캔버스 이미지와 사용자 그림을 합성하여 저장합니다.
+    CANVAS_IMAGE_PATH가 없어도 기본 이미지를 생성하여 처리합니다.
     """
     try:
-        image = Image.fromarray(numpy_array)
+        # 기존 이미지 사용
+        base_image = Image.open(CANVAS_IMAGE_PATH)
+        if base_image.mode != 'RGBA':
+            base_image = base_image.convert('RGBA')
+        # 캔버스 크기에 맞게 리사이즈
+        if base_image.size != (500, 500):
+            base_image = base_image.resize((500, 500), Image.Resampling.LANCZOS)
+        print(f"캔버스 배경 이미지 로드: {CANVAS_IMAGE_PATH}")
+        
+        # 사용자 그림과 합성
+        image = overlay_png_and_np_from_image(base_image, numpy_array)
+        
+        # 파일 저장
         current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         file_name = f"e-drawing-{current_time}"
         file_path = f"src/draw_images/{file_name}.png"
@@ -76,6 +90,7 @@ def save_draw_image(numpy_array):
         image.save(file_path, format="PNG")
         print(f"이미지 저장 완료: {file_path}")
         return file_path
+
     except Exception as e:
         st.error(f"이미지 저장 중 오류가 발생했습니다: {str(e)}")
         return None
@@ -441,7 +456,7 @@ with st.sidebar:
                 response = loop.run_until_complete(
                     handle_submission_async(
                         image_filepath,
-                        f"저는 다음과 같은 답변과 그에 대한 캔버스 그림을 제출했습니다. image_url의 제출된 <그림 답안>과 text로 쓰여진 <다음의 이유>를 보고 저에게 적절한 피드백을 제공해주세요: {st.session_state['explanation_user_reason']}", 
+                        f"<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}", 
                         system_prompt,
                         selected_model
                     )

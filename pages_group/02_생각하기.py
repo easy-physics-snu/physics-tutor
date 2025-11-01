@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
 from modules.keywords import create_keyword
-from modules.utils import overlay_png_and_np, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
+from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
 from modules.prompts import PEER_AI_02THINK_PROMPT
 
@@ -49,7 +49,7 @@ if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
 st.title("생각하기 🤔")
-st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 왼쪽 사이드바의 🤓**AI 친구**에게 물어보세요.")
+st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.")
 
 
 # 처음 1번만 실행하기 위한 코드
@@ -63,6 +63,17 @@ if "submit_button_disabled" not in st.session_state:
 if "multimodal_chain_with_history" not in st.session_state:
     st.session_state["multimodal_chain_with_history"] = None
 
+# 제출 여부 초기화 (다음단계 버튼 노출 조건)
+if "submission_triggered" not in st.session_state:
+    st.session_state["submission_triggered"] = False
+
+# show/hide the answer input UI
+if "show_predict_input" not in st.session_state:
+    st.session_state["show_predict_input"] = False
+
+# '다음단계로' 버튼 표시 여부를 영구적으로 기록
+if "can_proceed_to_next" not in st.session_state:
+    st.session_state["can_proceed_to_next"] = False
 
 # 비동기 체인 생성
 async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
@@ -126,34 +137,6 @@ def save_draw_image(numpy_array):
         return None
 
 
-def overlay_png_and_np_from_image(base_image, overlay_np, overlay_alpha=255):
-    """
-    PIL Image와 numpy array를 합성합니다.
-    """
-    from PIL import Image
-    import numpy as np
-    
-    # overlay_np를 RGBA로 변환
-    if overlay_np.shape[2] == 3:
-        # 불투명 알파 채널 추가
-        alpha = 255 * np.ones((overlay_np.shape[0], overlay_np.shape[1], 1), dtype=overlay_np.dtype)
-        overlay_np = np.concatenate([overlay_np, alpha], axis=-1)
-    overlay_img = Image.fromarray(overlay_np.astype('uint8'), 'RGBA')
-
-    # 크기 맞추기
-    if overlay_img.size != base_image.size:
-        overlay_img = overlay_img.resize(base_image.size, Image.Resampling.LANCZOS)
-
-    # overlay 드로잉 전체 투명도 조정
-    if overlay_alpha < 255:
-        r, g, b, a = overlay_img.split()
-        new_alpha = a.point(lambda p: overlay_alpha if p > 0 else 0)
-        overlay_img = Image.merge('RGBA', (r, g, b, new_alpha))
-
-    # 합성
-    return Image.alpha_composite(base_image, overlay_img)
-
-
 def save_draw_explanation(text):
     st.session_state["2stage_explanation"] = text
 
@@ -184,67 +167,88 @@ with st.expander(
     expanded=True
     ):
     main_tab1 = st.container(border=True)
-    main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 우주선이 있습니다.\n
-드디어! 새로운 행성을 발견한 우주선은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
-**이때, 우주선에 작용하는 (1) 알짜힘의 방향을 왼쪽의 캔버스에 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
+    main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n
+드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
+**이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
 """)
     with main_tab1:
         _, col2, _ = st.columns(3, vertical_alignment='center')
         col2.image(
             image=MOON_IMAGE_PATH,
         )
-        
+    
 
+# 사이드바 튜터 대화 턴(사용자 메시지 수) 확인 후 게이트
+user_turns = sum(1 for m in st.session_state.get("messages_predict", []) if getattr(m, "role", None) == "user")
 
-st.text("문제의 답을 예상해보세요.")
-st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
+if user_turns < 3:
+    st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 아래 정답 입력창이 열립니다.")
+    st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
 
-# 캔버스 이미지 미리 로딩
-with st.spinner("캔버스 이미지를 준비 중..."):
-    ensure_canvas_image_loaded(CANVAS_IMAGE_PATH, (500, 500))
-
-# 비동기 강제 이미지 로딩 캔버스 생성 (반드시 이미지 표시)
-canvas_result = create_async_canvas_with_guaranteed_image(
-    CANVAS_IMAGE_PATH,
-    fill_color="rgba(255, 165, 0, 0.3)",  # Fixed fill color with some opacity
-    stroke_width=3,
-    stroke_color="#000000",
-    background_color="#EEEEEE",
-    update_streamlit=True,
-    height=500,
-    width=500,
-    drawing_mode="freedraw",
-    point_display_radius=0,
-    key="canvas_intermediate_answer",
-)
-
-st.markdown("**캔버스 사용 방법**: ⬅️실행취소(undo), ➡️다시실행(redo), 🗑️전체초기화(clear)")
-
-reason = st.text_area(
-    label="예상의 이유를 자세히 적어보세요.",
-    placeholder="- 화살표(힘)의 방향이 어디로 향해야 할지\n- 왜 화살표(힘)의 방향이 그래야 하는지",
-    height=200,
-    on_change=enalble_submit_button
-)
-
-if not reason:
-    disalble_submit_button()
-
-submit_button = st.button(
-    label="제출하기",
+# '정답 입력하기' 버튼 (5턴 이상이 되면 활성화)
+open_btn = st.button(
+    "정답 입력하기",
     type="primary",
     use_container_width=True,
-    disabled=st.session_state["submit_button_disabled"]
+    disabled=(user_turns < 3),
+    key="open_predict_input"
 )
 
-if submit_button:
-    # 기본 제출 처리
-    saved_image_path = save_draw_image(canvas_result.image_data)
-    st.session_state["predict_user_reason"] = reason
-    st.session_state["predict_saved_image_path"] = saved_image_path
-    st.session_state["submission_triggered"] = True  # 제출이 트리거되었음을 표시
-    st.success("좌측 사이드바의 **🤓AI 친구**의 피드백을 확인해주세요!")
-    st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)")
+# 버튼 클릭 시 입력 UI 표시 플래그 설정
+if open_btn:
+    st.session_state["show_predict_input"] = True
+
+# 플래그가 True일 때만 캔버스와 입력칸 노출
+if st.session_state.get("show_predict_input", False):
+    st.text("문제의 답을 예상해보세요.")
+    st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
+
+    # 캔버스 이미지 미리 로딩
+    with st.spinner("캔버스 이미지를 준비 중..."):
+        ensure_canvas_image_loaded(CANVAS_IMAGE_PATH, (500, 500))
+
+    # 비동기 강제 이미지 로딩 캔버스 생성 (반드시 이미지 표시)
+    canvas_result = create_async_canvas_with_guaranteed_image(
+        CANVAS_IMAGE_PATH,
+        fill_color="rgba(255, 165, 0, 0.3)",  # Fixed fill color with some opacity
+        stroke_width=3,
+        stroke_color="#000000",
+        background_color="#EEEEEE",
+        update_streamlit=True,
+        height=500,
+        width=500,
+        drawing_mode="freedraw",
+        point_display_radius=0,
+        key="canvas_intermediate_answer",
+    )
+
+    st.markdown("**캔버스 사용 방법**: ⬅️실행취소(undo), ➡️다시실행(redo), 🗑️전체초기화(clear)")
+
+    reason = st.text_area(
+        label="예상의 이유를 자세히 적어보세요.",
+        placeholder="- 화살표(힘)의 방향이 어디로 향해야 할지\n- 왜 화살표(힘)의 방향이 그래야 하는지",
+        height=200,
+        on_change=enalble_submit_button
+    )
+
+    if not reason:
+        disalble_submit_button()
+
+    submit_button = st.button(
+        label="제출하기",
+        type="primary",
+        use_container_width=True,
+        disabled=st.session_state["submit_button_disabled"]
+    )
+
+    if submit_button:
+        # 기본 제출 처리
+        saved_image_path = save_draw_image(canvas_result.image_data)
+        st.session_state["predict_user_reason"] = reason
+        st.session_state["predict_saved_image_path"] = saved_image_path
+        st.session_state["submission_triggered"] = True  # 제출이 트리거되었음을 표시
+        st.success("좌측 사이드바의 **🤓AI 친구**의 피드백을 확인해주세요!")
+        st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)")
 
 # Create columns with specific ratios
 col1, col2, col3 = st.columns([5, 2, 2])
@@ -260,7 +264,20 @@ with col1:
         st.switch_page("pages_group/01_들어가기.py")
 
 
-if st.session_state.get("submission_triggered", True):
+# '다음단계로' 버튼은 (1) 5턴 이상 대화 AND (2) 정답 제출 완료 후 노출
+# 조건을 만족하면 영구적으로 표시 플래그 설정
+current_can_show = (
+    st.session_state.get("submission_triggered", False)
+    and bool(st.session_state.get("predict_saved_image_path"))
+    and bool(st.session_state.get("predict_user_reason"))
+)
+
+# 조건을 만족하면 플래그를 True로 설정 (한번 True가 되면 계속 유지)
+if current_can_show:
+    st.session_state["can_proceed_to_next"] = True
+
+# 플래그가 True면 버튼 표시
+if st.session_state.get("can_proceed_to_next", False):
     # Place the button in the last column
     with col3:
         if st.button(
@@ -301,7 +318,7 @@ with st.sidebar:
 
     # 초기 대화 기록 추가
     if len(st.session_state["messages_predict"]) == 0:
-        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("안녕! 나랑 같이 원운동을 탐구해보자!")
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("안녕! 나랑 같이 차근차근 원운동을 탐구해보자!")
     else:
         pass
 
@@ -312,7 +329,7 @@ with st.sidebar:
     user_input = st.chat_input("궁금한 내용을 물어보세요!")
 
     ## 사용자 답변 제출에 대한 추가 로직(캔버스 사용 시)
-    if st.session_state.get("submission_triggered", True) and "predict_saved_image_path" in st.session_state:
+    if st.session_state.get("submission_triggered", False) and "predict_saved_image_path" in st.session_state:
         # 비동기 처리를 위한 상태 설정
         st.session_state["submission_in_progress"] = True
         
@@ -327,13 +344,14 @@ with st.sidebar:
             
             try:
                 # 이미지 파일을 bytesio로 변환후 path 반환 처리
-                image_filepath = process_png_to_bytesio(st.session_state["predict_saved_image_path"])                # 이미지 파일을 처리
+                image_filepath = process_png_to_bytesio(st.session_state["predict_saved_image_path"])
+                
                 # AI 답변과 함께 제출 처리
                 # 비동기 요청
                 response = loop.run_until_complete(
                     handle_submission_async(
                         image_filepath,
-                        f"저는 다음과 같은 답변과 그에 대한 캔버스 그림을 제출했습니다. image_url의 제출된 <그림 답안>과 text로 쓰여진 <다음의 이유>를 보고 저에게 적절한 피드백을 제공해주세요: {st.session_state['predict_user_reason']}", 
+                        f"<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}", 
                         system_prompt,
                         selected_model
                     )

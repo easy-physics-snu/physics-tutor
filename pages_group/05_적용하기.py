@@ -127,7 +127,7 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
 ########### Mainpage Logic ###########
 ######################################
 st.title("적용하기 💡")
-st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 왼쪽 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.")
+st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 좌측 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.")
 
 @st.fragment
 def update_progress(progress_value, current_step, total_steps):
@@ -157,8 +157,9 @@ with st.sidebar:
         current_step = 2
         total_steps = 2
         progress_value = 1.0
-    elif len(st.session_state.get("messages_application", [])) > 0:
-        # 답변을 한 번이라도 제출했으면 50%
+    elif (len(st.session_state.get("messages_application", [])) > 0 and 
+        any(msg.role == "user" for msg in st.session_state.get("messages_application", []))):
+        # 사용자 메시지가 한 번이라도 있으면 50% (즉, 실제로 답변을 제출했을 때만)
         current_step = 1
         total_steps = 2
         progress_value = 0.5
@@ -258,7 +259,7 @@ if not st.session_state.get("show_resources", False):
             st.session_state["feedback_processed"] = False  # 피드백 처리 플래그 리셋
             st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1  # text_area 키 변경
             st.session_state["last_submission_time"] = current_time  # 제출 시간 기록
-            st.success("제출 완료! 왼쪽 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
+            st.success("제출 완료! 좌측 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
 
 # 메인 하단 리소스 섹션
 if st.session_state.get("show_resources", False):

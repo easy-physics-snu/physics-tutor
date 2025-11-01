@@ -37,6 +37,31 @@ def process_png_to_bytesio(file_path) -> str:
     return file_path
 
 
+def overlay_png_and_np_from_image(base_image, overlay_np, overlay_alpha=255):
+    """
+    PIL Image와 numpy array를 합성합니다.
+    """
+    # overlay_np를 RGBA로 변환
+    if overlay_np.shape[2] == 3:
+        # 불투명 알파 채널 추가
+        alpha = 255 * np.ones((overlay_np.shape[0], overlay_np.shape[1], 1), dtype=overlay_np.dtype)
+        overlay_np = np.concatenate([overlay_np, alpha], axis=-1)
+    overlay_img = Image.fromarray(overlay_np.astype('uint8'), 'RGBA')
+
+    # 크기 맞추기
+    if overlay_img.size != base_image.size:
+        overlay_img = overlay_img.resize(base_image.size, Image.Resampling.LANCZOS)
+
+    # overlay 드로잉 전체 투명도 조정
+    if overlay_alpha < 255:
+        r, g, b, a = overlay_img.split()
+        new_alpha = a.point(lambda p: overlay_alpha if p > 0 else 0)
+        overlay_img = Image.merge('RGBA', (r, g, b, new_alpha))
+
+    # 합성
+    return Image.alpha_composite(base_image, overlay_img)
+
+
 def overlay_png_and_np(base_image_path: str, overlay_np: np.ndarray, overlay_alpha=255) -> Image:
     """
     base_image_path: 배경 PNG 이미지 파일 경로

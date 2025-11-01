@@ -164,6 +164,14 @@
       box-shadow: 0 4px 12px rgba(102,126,234,0.3);
     }
     
+    /* Center stepper buttons under each value (minimal styling) */
+    .stepper {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    
     .info-panel {
       background: #f0f7ff;
       border-left: 4px solid #667eea;
@@ -268,18 +276,30 @@
             <label for="angleSlider">힘의 각도 (힘의 방향)</label>
             <input type="range" id="angleSlider" min="-180" max="180" value="0" step="1">
             <div class="slider-value" id="angleValue">0°</div>
+            <div class="stepper">
+              <button type="button" id="angleDec">◀</button>
+              <button type="button" id="angleInc">▶</button>
+            </div>
           </div>
           
           <div class="slider-container">
             <label for="forceSlider">힘의 크기</label>
             <input type="range" id="forceSlider" min="0.5" max="5" value="1.5" step="0.1">
             <div class="slider-value" id="forceValue">1.5</div>
+            <div class="stepper">
+              <button type="button" id="forceDec">◀</button>
+              <button type="button" id="forceInc">▶</button>
+            </div>
           </div>
           
           <div class="slider-container">
             <label for="radiusSlider">궤도 반지름</label>
             <input type="range" id="radiusSlider" min="30" max="150" value="55" step="5">
             <div class="slider-value" id="radiusValue">55 px</div>
+            <div class="stepper">
+              <button type="button" id="radiusDec">◀</button>
+              <button type="button" id="radiusInc">▶</button>
+            </div>
           </div>
           
           <div class="buttons">
@@ -333,6 +353,12 @@
     const runBtn = document.getElementById('runBtn');
     const velocityMagDisplay = document.getElementById('velocityMagDisplay');
     const velocityAngleDisplay = document.getElementById('velocityAngleDisplay');
+    const angleDec = document.getElementById('angleDec');
+    const angleInc = document.getElementById('angleInc');
+    const forceDec = document.getElementById('forceDec');
+    const forceInc = document.getElementById('forceInc');
+    const radiusDec = document.getElementById('radiusDec');
+    const radiusInc = document.getElementById('radiusInc');
     
     let runInterval = null;
     const angleStep = 0.55;
@@ -664,6 +690,24 @@
     });
 
     resetBtn.addEventListener('click', reset);
+
+    function adjustByStep(slider, deltaSteps, formatter) {
+      const min = parseFloat(slider.min);
+      const max = parseFloat(slider.max);
+      const step = parseFloat(slider.step || '1');
+      let v = parseFloat(slider.value) + deltaSteps * step;
+      v = Math.round(v / step) * step; // step 격자에 스냅
+      v = Math.max(min, Math.min(max, v));
+      slider.value = formatter ? formatter(v) : String(v);
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    angleDec.addEventListener('click', () => adjustByStep(angleSlider, -1));
+    angleInc.addEventListener('click', () => adjustByStep(angleSlider, 1));
+    forceDec.addEventListener('click', () => adjustByStep(forceSlider, -1, v => v.toFixed(1)));
+    forceInc.addEventListener('click', () => adjustByStep(forceSlider, 1, v => v.toFixed(1)));
+    radiusDec.addEventListener('click', () => adjustByStep(radiusSlider, -1));
+    radiusInc.addEventListener('click', () => adjustByStep(radiusSlider, 1));
 
     // 초기화
     reset();

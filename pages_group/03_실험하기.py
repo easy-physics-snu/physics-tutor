@@ -52,12 +52,20 @@ MOON_IMAGE_PATH = "src/images/satellite_moon.png"
 SIDEBAR_AI_AVATAR = "src/images/ai_peer_avatar.png"
 
 
+if "tutor_messages" not in st.session_state:
+    # 대화기록을 저장하기 위한 용도로 생성한다.
+    st.session_state["tutor_messages"] = []
+
+# '다음단계로' 버튼 표시 여부를 영구적으로 기록
+if "can_proceed_to_next" not in st.session_state:
+    st.session_state["can_proceed_to_next"] = False
+
+
 def enalble_submit_button():
     st.session_state["submit_button_disabled"] = False
 
 def disalble_submit_button():
     st.session_state["submit_button_disabled"] = True
-
 
 def output_parser(response: str) -> str:
     content = re.search(r'```python\n(.*?)\n```', response, re.DOTALL)
@@ -103,7 +111,8 @@ left_col, right_col = info_container.columns([4, 1])
 with left_col:
     message = """
 - 앞에서 제출한 답을 떠올리며 시뮬레이션을 관찰하고 조작해보세요.
-- 시뮬레이션에 대해서 궁금한건 🤓**AI 친구**에게 물어보세요.
+- 시뮬레이션에 대해서 궁금한건 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.
+- 🤓**AI 친구**와의 대화를 바탕으로 시뮬레이션을 조작해보고, 관찰 결과를 바탕으로 궁금한 것을 **🤓AI 친구**에게 다시 물어보세요.
 """
 #- ⭐ **[내 실험실]에서는 내가 제출한 답을 시뮬레이션 해 볼 수 있어요** ⭐
 
@@ -233,12 +242,12 @@ with right_col:
 
 with st.expander(
     label="문제 보기 🔍",
-    expanded=True
+    expanded=False
     ):
     main_tab1 = st.container(border=True)
     main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 우주선이 있습니다.\n
 드디어! 새로운 행성을 발견한 우주선은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
-**이때, 우주선에 작용하는 (1) 알짜힘의 방향을 왼쪽의 캔버스에 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
+**이때, 우주선에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
 """)
     with main_tab1:
         _, col2, _ = st.columns(3, vertical_alignment='center')
@@ -351,7 +360,7 @@ with st.sidebar:
 
     # 초기 대화 기록 추가
     if len(st.session_state["tutor_messages"]) == 0:
-        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("안녕! 나랑 같이 원운동을 탐구해보자!")
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("시뮬레이션에 대해서 궁금한게 있으면 뭐든지 물어봐!")
     else:
         pass
 
@@ -415,12 +424,26 @@ with col1:
     ):
         st.switch_page("pages_group/02_생각하기.py")
 
-# Place the button in the last column
-with col3:
-    if st.button(
-        label="다음단계로",
-        icon="⏩",
-        help="돌아보기로 이동하기",
-        type="primary"
-    ):
-        st.switch_page("pages_group/04_돌아보기.py")
+# 사이드바 튜터 대화 턴(사용자 메시지 수) 확인
+user_turns = sum(1 for m in st.session_state.get("tutor_messages", []) if getattr(m, "role", None) == "user")
+
+# 3턴 미만일 때 안내 메시지
+if user_turns < 3:
+    st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
+    st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
+
+# 조건을 만족하면 영구적으로 표시 플래그 설정
+if user_turns >= 3:
+    st.session_state["can_proceed_to_next"] = True
+
+# 플래그가 True면 버튼 표시
+if st.session_state.get("can_proceed_to_next", False):
+    # Place the button in the last column
+    with col3:
+        if st.button(
+            label="다음단계로",
+            icon="⏩",
+            help="돌아보기로 이동하기",
+            type="primary"
+        ):
+            st.switch_page("pages_group/04_돌아보기.py")

@@ -144,6 +144,8 @@ async def handle_submission_async(image_url, reason_text, system_prompt, selecte
         return None
 
 
+st.set_page_config(layout="wide")
+
 st.title("돌아보기 🧐")
 
 # Create a container for the info message and tooltip

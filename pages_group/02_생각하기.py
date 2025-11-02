@@ -48,6 +48,8 @@ if not os.path.exists(".cache/files"):
 if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
+st.set_page_config(layout="wide")
+
 st.title("생각하기 🤔")
 st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.")
 

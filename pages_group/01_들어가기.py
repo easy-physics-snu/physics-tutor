@@ -70,6 +70,8 @@ if "balloons_done" not in st.session_state:
 ######################################
 ########### Mainpage Logic ###########
 ######################################
+st.set_page_config(layout="wide")
+
 st.title("들어가기 🚀")
 
 st.subheader("오늘 배울 물리 개념은?")

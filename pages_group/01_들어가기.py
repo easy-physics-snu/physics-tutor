@@ -1,14 +1,10 @@
 import os
-import re
 import streamlit as st
 import pandas as pd
 
 from openai import OpenAI
 
-from langchain_core.messages.chat import ChatMessage
-from modules.retrieval import embed_file, create_chain
-from langchain_teddynote import logging
-
+# from langchain_teddynote import logging
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]

@@ -4,12 +4,12 @@ import streamlit as st
 from PIL import Image
 from datetime import datetime
 
-from streamlit_drawable_canvas import st_canvas
+# from streamlit_drawable_canvas import st_canvas
 from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 
 from modules.multimodal import MultiModalwithHistory
-from modules.keywords import create_keyword
+# from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 
 from modules.prompts import PEER_AI_02THINK_PROMPT
@@ -296,8 +296,8 @@ if st.session_state.get("can_proceed_to_next", False):
 with st.sidebar:
 
     # 추천 질문 사용 여부 토글 추가
-    toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
-    st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
+    # toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
+    # st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
     st.write("**AI 친구**에게 물어보기")
     spinner_box = st.empty()
@@ -388,20 +388,20 @@ with st.sidebar:
 
 
     # 추천 질문 사용 여부에 따라 조건부 표시
-    if st.session_state.get("toggle_recommended_questions", True):
-        st.text("추천 질문 (클릭 시 다른 질문이 생성됩니다)")
-        col1, col2 = st.columns(2)
-        placeholder1 = col1.empty()
-        placeholder2 = col2.empty()
+    # if st.session_state.get("toggle_recommended_questions", True):
+    #     st.text("추천 질문 (클릭 시 다른 질문이 생성됩니다)")
+    #     col1, col2 = st.columns(2)
+    #     placeholder1 = col1.empty()
+    #     placeholder2 = col2.empty()
 
-        # 키워드 질문 처리
-        kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
-        kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
-        kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
-    else:
-        # 추천 질문을 사용하지 않는 경우 버튼들을 None으로 설정
-        kw_button_1 = None
-        kw_button_2 = None
+    #     # 키워드 질문 처리
+    #     kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
+    #     kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
+    #     kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
+    # else:
+    #     # 추천 질문을 사용하지 않는 경우 버튼들을 None으로 설정
+    #     kw_button_1 = None
+    #     kw_button_2 = None
 
 
     # 만약에 사용자 입력이 들어오면...

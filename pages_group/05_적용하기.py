@@ -126,6 +126,8 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
 ######################################
 ########### Mainpage Logic ###########
 ######################################
+st.set_page_config(layout="wide")
+
 st.title("적용하기 💡")
 st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 좌측 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.")
 

@@ -126,60 +126,58 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
 ######################################
 ########### Mainpage Logic ###########
 ######################################
-st.set_page_config(layout="wide")
-
 st.title("적용하기 💡")
 st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 좌측 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.")
 
-@st.fragment
-def update_progress(progress_value, current_step, total_steps):
-    st.progress(progress_value, text=f"진행률: {progress_value*100:.0f}% ({current_step}/{total_steps})")
+# @st.fragment
+# def update_progress(progress_value, current_step, total_steps):
+#     st.progress(progress_value, text=f"진행률: {progress_value*100:.0f}% ({current_step}/{total_steps})")
 
 
-# Progress bar를 우측 상단에 고정
-with st.sidebar:
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"] {
-            position: fixed;
-            right: 0;
-            top: 0;
-            height: auto;
-            width: auto;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    st.markdown("⏳ 적용하기 진행률")
+# # Progress bar를 우측 상단에 고정
+# with st.sidebar:
+#     st.markdown(
+#         """
+#         <style>
+#         [data-testid="stSidebar"] {
+#             position: fixed;
+#             right: 0;
+#             top: 0;
+#             height: auto;
+#             width: auto;
+#         }
+#         </style>
+#         """,
+#         unsafe_allow_html=True
+#     )
+#     st.markdown("⏳ 적용하기 진행률")
     
-    # 진행률 계산: 대화 완료 여부에 따라
-    if st.session_state.get("show_resources", False) or st.session_state.get("conversation_completed", False):
-        current_step = 2
-        total_steps = 2
-        progress_value = 1.0
-    elif (len(st.session_state.get("messages_application", [])) > 0 and 
-        any(msg.role == "user" for msg in st.session_state.get("messages_application", []))):
-        # 사용자 메시지가 한 번이라도 있으면 50% (즉, 실제로 답변을 제출했을 때만)
-        current_step = 1
-        total_steps = 2
-        progress_value = 0.5
-    else:
-        # 아직 시작 전이면 0%
-        current_step = 0
-        total_steps = 2
-        progress_value = 0.0
+#     # 진행률 계산: 대화 완료 여부에 따라
+#     if st.session_state.get("show_resources", False) or st.session_state.get("conversation_completed", False):
+#         current_step = 2
+#         total_steps = 2
+#         progress_value = 1.0
+#     elif (len(st.session_state.get("messages_application", [])) > 0 and 
+#         any(msg.role == "user" for msg in st.session_state.get("messages_application", []))):
+#         # 사용자 메시지가 한 번이라도 있으면 50% (즉, 실제로 답변을 제출했을 때만)
+#         current_step = 1
+#         total_steps = 2
+#         progress_value = 0.5
+#     else:
+#         # 아직 시작 전이면 0%
+#         current_step = 0
+#         total_steps = 2
+#         progress_value = 0.0
     
-    update_progress(progress_value, current_step, total_steps)    
+#     update_progress(progress_value, current_step, total_steps)    
 
 
 with st.container(border=True):  # border=True로 실선 테두리 추가
     st.markdown(body="""
     ## 등속 원운동
 
-    놀이공원의 회전목마, 지구 주위를 도는 인공위성, 시곗바늘 등은 일정한 속력으로 원을 그리며 운동하는데, 이러한 운동을 등속 원운동이라고 한다.
-    등속 원운동 하는 물체는 속력이 변하지 않고 운동 방향만 변한다. (교과서 16쪽)
+    놀이공원의 회전하는 관람차, 지구 주위를 도는 인공위성, 시계의 바늘 등은 일정한 속력으로 원을 그리며 운동하는데, 이러한 운동을 등속 원운동이라고 한다.
+    등속 원운동 하는 물체는 속력이 변하지 않고 운동 방향만 변한다. (미래엔 교과서 16쪽)
     """)
 
 st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
@@ -197,7 +195,16 @@ applyingQuestion = """
 """
 
 # 적용하기 모범답안 (나중엔 DB에서 불러오면 좋을 듯)
-applyingModeledAnswer = "지구가 달에 지구 중심방향으로 향하는 힘(중력)을 작용하고 있어서, 달은 지구 주변을 계속 원운동할 수 있습니다." 
+applyingModeledAnswer = [
+    "지구가 달에 지구 중심방향으로 향하는 힘(중력)을 작용하고 있어서, 달은 지구 주변을 계속 원운동할 수 있습니다.",
+    "지구의 중력이 구심력으로 작용하여 달이 계속 원운동을 할 수 있습니다.",
+    "지구가 달을 끌어당기는 중력이 작용하고 있어서, 달은 공전 궤도를 유지할 수 있습니다.",
+    "중력이 구심력 역할을 하여 달이 지구 주변을 원운동할 수 있습니다.",
+    "지구 중심 방향으로 중력이 작용해서 달이 등속 원운동을 유지할 수 있습니다.",
+    "지구가 달에 지구 중심 방향으로 중력을 작용하고, 이 힘이 달의 원운동을 가능하게 합니다.",
+    "달에 작용하는 지구의 중력(구심력) 때문에 달은 궤도를 이탈하지 않고 계속 공전할 수 있습니다.",
+    "달과 지구 사이의 만유인력(중력) 때문에 달이 지구 중심 방향으로 힘을 받아 원운동 하게 됩니다."
+] 
 
 # 핵심 개념(나중엔 DB에서 불러오면 좋을 듯)
 essential_contents = "등속 원운동"
@@ -295,10 +302,17 @@ with st.sidebar:
             [
                 (
                     "system",
-                    """You are a grader assessing the relevance of a student's essay answer to a given model answer. 
-                    Here is the model answer: {applyingModeledAnswer}
+                    """You are a grader assessing the relevance of a student's essay answer to given model answers. 
+                    Here are acceptable model answers (student's answer should match any of these):
+                    {applyingModeledAnswer}
 
                     Consider both the student's current answer and their previous responses in the conversation history to evaluate their understanding.
+                    
+                    **Important Notes:**
+                    - "구심력(centripetal force)" is an OPTIONAL advanced term. Students can explain correctly without using this term.
+                    - As long as the student mentions "중력(gravity)" acting "towards the center" or "pulling towards Earth", the answer is complete.
+                    - Only mark concepts as missing if they are ESSENTIAL to understanding circular motion (e.g., force, direction toward center, circular motion).
+                    - Do NOT list "구심력" in missing_contents unless the student's answer completely lacks the concept of center-directed force.
                     
                     Evaluation criteria:
                     1. Accuracy and relevance compared to the model answer
@@ -339,11 +353,12 @@ with st.sidebar:
 
                     **중요:** 다음 규칙을 반드시 따르세요.
                     1. 세 문장을 넘지 않도록 대화를 생성하세요.  
-                    2. ⚠️ **절대 금지**: 정답이나 지나친 암시를 제공하지 마세요.
+                    2. ⚠️ **절대 금지**: 정답이나 지나친 암시를 제공하지 마세요. [모범 답안]은 평가 기준으로만 사용하고, 학생에게 직접 알려주지 마세요.
                     3. 만약 학생의 답변에 [놓친 개념]이 있다면, [놓친 개념]을 질문 형태로 간접적으로 제시해주고, 이를 포함하여 정확하게 답변해달라고 요청하세요.
                     4. 만약 학생의 답변에 [잘못된 개념]이 있다면 
                         - [잘못된 개념]에 대해 직접적으로 말하지 말고, 학생이 스스로 탐색할 수 있도록 열린 질문을 통해 [잘못된 개념]에 불만족을 가질 수 있도록 반례를 들어 학생과 문답하세요.
                         - 만약 [잘못된 개념]에 대하여 3회 이상 문답했지만 계속 [잘못된 개념]을 고수하는 경우에는 올바른 과학적 개념을 알려주세요.
+                    5. 학생이 장난스럽거나 부적절한 답변을 하더라도, 교육자로서 차분하고 친절하게 진지한 답변을 권유하세요. 
                        
 
                     [답변 점수]: {score}
@@ -486,30 +501,27 @@ with st.sidebar:
                 if feedback_placeholder:
                     feedback_placeholder.empty()
                 
-                st.balloons()
                 with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     st.markdown(f"**현재 점수: ⭐⭐⭐⭐⭐**")
                     st.write("축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.")
-                    st.markdown("   [**" + f"{applyingModeledAnswer}"+"**]")
+                    st.markdown("   [**" + f"{applyingModeledAnswer[0]}"+"**]")
                     if len(st.session_state['missing_contents']) > 0:
                         missing_text = ''.join(st.session_state['missing_contents']).strip()
                         if missing_text:  # 빈 문자열이 아닌 경우에만 출력
-                            st.write(f"   지금도 충분히 좋은 답변이지만, [{missing_text}] 를 포함하여 작성했다면 더 완벽한 답이 작성되었겠네요.")
-                    st.write("오늘 수업은 여기까지입니다. 잠시 뒤 수업 마무리 화면으로 넘어갑니다.")
-                    time.sleep(6)
+                            st.write(f"   지금 답변에서 [{missing_text}] 도 고려하면 더 완벽한 답변이 될 거예요.")
+                    st.write("오늘 수업은 여기까지입니다. 아래 버튼을 클릭하여 메인 화면에서 더 알아보기 자료를 확인해보세요!")
                 
                 # 완료 메시지를 대화 기록에 추가 (별 5개 포함)
-                completion_msg = f"**현재 점수: ⭐⭐⭐⭐⭐**\n\n축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer}**]"
+                completion_msg = f"**현재 점수: ⭐⭐⭐⭐⭐**\n\n축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
                 if len(st.session_state['missing_contents']) > 0:
                     missing_text = ''.join(st.session_state['missing_contents']).strip()
                     if missing_text:
-                        completion_msg += f"\n\n지금도 충분히 좋은 답변이지만, [{missing_text}] 를 포함하여 작성했다면 더 완벽한 답이 작성되었겠네요."
-                completion_msg += "\n\n오늘 수업은 여기까지입니다. 메인 화면에서 더 알아보기 자료를 확인해보세요!"
+                        completion_msg += f"\n\n지금 답변에서 [{missing_text}] 도 고려하면 더 완벽한 답변이 될 거예요."
+                completion_msg += "\n\n오늘 수업은 여기까지입니다. 아래 버튼을 클릭하여 메인 화면에서 더 알아보기 자료를 확인해보세요!"
                 add_message("assistant", completion_msg)
                 
-                # 대화 종료 및 리소스 섹션 노출 플래그 설정 (모범답안 표시 후)
+                # 대화 종료 플래그 설정 (리소스 섹션은 버튼 클릭 시 노출)
                 st.session_state["conversation_completed"] = True
-                st.session_state["show_resources"] = True
                 st.rerun()
             else:
                 # 80점 미만이면 일반 피드백을 대화 기록에 추가 (별 모양 포함)
@@ -548,27 +560,24 @@ with st.sidebar:
             # 점수 확인 및 완료 처리
             try:
                 if st.session_state.get("score", 0) >= 80:
-                    st.balloons()
-                    
                     # 완료 메시지만 대화 기록에 추가 (별 5개 포함)
                     completion_message = f"""**현재 점수: ⭐⭐⭐⭐⭐**
 
 축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.
 
-[**{applyingModeledAnswer}**]"""
+[**{applyingModeledAnswer[0]}**]"""
                     
                     if len(st.session_state.get('missing_contents', '')) > 0:
                         missing_text = ''.join(st.session_state['missing_contents']).strip()
                         if missing_text:
-                            completion_message += f"\n\n지금도 충분히 좋은 답변이지만, [{missing_text}] 를 포함하여 작성했다면 더 완벽한 답이 작성되었겠네요."
+                            completion_message += f"\n\n지금 답변에서 [{missing_text}] 도 고려하면 더 완벽한 답변이 될 거예요."
                     
-                    completion_message += "\n\n오늘 수업은 여기까지입니다. 메인 화면에서 더 알아보기 자료를 확인해보세요!"
+                    completion_message += "\n\n오늘 수업은 여기까지입니다. 아래 버튼을 클릭하여 메인 화면에서 더 알아보기 자료를 확인해보세요!"
                     
                     add_message("assistant", completion_message)
                     
-                    # 대화 종료 및 리소스 섹션 노출 플래그 설정 (모범답안 추가 후)
+                    # 대화 종료 플래그 설정 (리소스 섹션은 버튼 클릭 시 노출)
                     st.session_state["conversation_completed"] = True
-                    st.session_state["show_resources"] = True
                 else:
                     # 80점 미만이면 일반 피드백을 대화 기록에 추가 (별 모양 포함)
                     stars = score_to_stars(st.session_state.get("score", 0))
@@ -578,6 +587,19 @@ with st.sidebar:
                 st.error(f"처리 중 오류가 발생했습니다: {e}")
             
             # 화면 새로고침으로 새 메시지 표시
+            st.rerun()
+    
+    # 대화 완료 후 "더 알아보기" 버튼 표시
+    if (st.session_state.get("conversation_completed", False) and 
+        not st.session_state.get("show_resources", False)):
+        # 버튼이 처음 표시될 때 한 번만 풍선 효과
+        if not st.session_state.get("completion_balloons_done", False):
+            st.balloons()
+            st.session_state["completion_balloons_done"] = True
+        
+        st.markdown("---")
+        if st.button("📚 더 알아보기", type="primary", use_container_width=True, key="show_resources_button"):
+            st.session_state["show_resources"] = True
             st.rerun()
 
 # Create columns with specific ratios

@@ -177,7 +177,7 @@ with tab1:
     if st.session_state.q1 and st.session_state.q2:
         st.subheader("**핵심 정리!**")
         st.info("속력이 변하는 운동, 운동 방향이 변하는 운동, 속력과 운동 방향이 모두 변하는 운동은 모두 **가속도 운동**이다.")
-        st.image("src/images/explain_2.png")
+        st.image("src/images/explain_2.png", caption="출처: 미래엔 교과서")
         
         # tab1 완료 시 다음 tab으로 안내
         st.success("🎉 Tab 1 완료! 이제 '힘과 운동' 탭으로 이동해주세요.")
@@ -343,7 +343,7 @@ with tab2:
                             # Q3 이미지(explain_5.png)일 때만 스크롤 안내 표시
                             if "explain_5.png" in message["image"]:
                                 st.caption("💡 아래로 스크롤하여 전체 내용을 확인하세요 ⬇️")
-                            st.image(message["image"], use_container_width=True)
+                            st.image(message["image"], use_container_width=True, caption="출처: 미래엔 교과서")
             else:
                 with chat_container.chat_message(message["role"]):
                     st.write(message["content"])

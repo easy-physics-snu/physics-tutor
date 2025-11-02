@@ -22,8 +22,8 @@ from langchain_openai import ChatOpenAI
 # from langchain_ollama import ChatOllama
 # from langchain_anthropic import ChatAnthropic
 
-from modules.keywords import create_keyword
-import simulation.simulation as simulation
+# from modules.keywords import create_keyword
+# import simulation.simulation as simulation
 
 from modules.prompts import PEER_AI_03EXPERIMENT_PROMPT
 
@@ -277,7 +277,7 @@ with st.container(border=True):
 
     # 로컬 HTML 파일 임베드
     try:
-        with open('circular-motion-sim_responsive.html', 'r', encoding='utf-8') as f:
+        with open('simulation/circular-motion-sim_responsive.html', 'r', encoding='utf-8') as f:
             circular_html_content = f.read()
         
         components.html(circular_html_content, height=590, width=870, scrolling=False)
@@ -341,8 +341,8 @@ with st.sidebar:
     # operation = "예비실험실"
 
     # 추천 질문 사용 여부 토글 추가
-    toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
-    st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
+    # toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
+    # st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
     st.write("**AI 친구**에게 물어보기")
     messages = st.container(height=400)
@@ -369,20 +369,20 @@ with st.sidebar:
     print_messages()
 
     # 추천 질문 사용 여부에 따라 조건부 표시
-    if st.session_state.get("toggle_recommended_questions", True):
-        st.text("추천 질문 (클릭 시 다른 질문이 생성됩니다)")
-        col1, col2 = st.columns(2)
-        placeholder1 = col1.empty()
-        placeholder2 = col2.empty()
+    # if st.session_state.get("toggle_recommended_questions", True):
+    #     st.text("추천 질문 (클릭 시 다른 질문이 생성됩니다)")
+    #     col1, col2 = st.columns(2)
+    #     placeholder1 = col1.empty()
+    #     placeholder2 = col2.empty()
 
-        # 키워드 질문 처리
-        kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
-        kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
-        kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
-    else:
-        # 추천 질문을 사용하지 않는 경우 버튼들을 None으로 설정
-        kw_button_1 = None
-        kw_button_2 = None
+    #     # 키워드 질문 처리
+    #     kw_1, kw_2 = create_keyword(st.session_state["tutor_messages"], keyword_section="03_experiment")
+    #     kw_button_1 = placeholder1.button(label=kw_1, use_container_width=True)
+    #     kw_button_2 = placeholder2.button(label=kw_2, use_container_width=True)
+    # else:
+    #     # 추천 질문을 사용하지 않는 경우 버튼들을 None으로 설정
+    #     kw_button_1 = None
+    #     kw_button_2 = None
 
     # 사용자의 입력
     user_input = st.chat_input("궁금한 내용을 물어보세요!")

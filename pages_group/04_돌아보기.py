@@ -6,7 +6,7 @@ import asyncio
 
 from PIL import Image
 from datetime import datetime
-from streamlit_drawable_canvas import st_canvas
+# from streamlit_drawable_canvas import st_canvas
 
 from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
@@ -379,14 +379,31 @@ with tab2:
             st.switch_page("pages_group/03_실험하기.py")
 
     # Place the button in the last column
-    with col3:
-        if st.button(
-            label="다음단계로",
-            icon="⏩",
-            help="적용하기로 이동하기",
-            type="primary"
-        ):
-            st.switch_page("pages_group/05_적용하기.py")
+    # 답안 제출이 완료되었는지 확인
+    submission_complete = (
+        "explanation_saved_image_path" in st.session_state 
+        and "explanation_user_reason" in st.session_state
+    )
+
+    # 한 번 표시된 이후는 계속 유지되도록 세션 상태 체크
+    if "next_step_button_shown" not in st.session_state:
+        st.session_state["next_step_button_shown"] = False
+    
+    # 제출이 완료되면 버튼 표시 상태를 True로 설정
+    if submission_complete and not st.session_state["next_step_button_shown"]:
+        st.session_state["next_step_button_shown"] = True
+    
+    # 버튼 표시 조건: 제출 완료되었거나 이전에 표시된 적이 있는 경우
+    if submission_complete or st.session_state["next_step_button_shown"]:
+        # Place the button in the last column
+        with col3:
+            if st.button(
+                label="다음단계로",
+                icon="⏩",
+                help="적용하기로 이동하기",
+                type="primary"
+            ):
+                st.switch_page("pages_group/05_적용하기.py")
 
 #####################################
 ########### Sibebar Logic ###########

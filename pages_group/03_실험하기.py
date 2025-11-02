@@ -279,7 +279,7 @@ with st.container(border=True):
         with open('circular-motion-sim_responsive.html', 'r', encoding='utf-8') as f:
             circular_html_content = f.read()
         
-        components.html(circular_html_content, height=1200, width=675, scrolling=False)
+        components.html(circular_html_content, height=1040, width=675, scrolling=False)
 
         st.markdown("""
         <style>

@@ -1,19 +1,18 @@
 import os
-import re
 import streamlit as st
 import time
+# # from pydantic import BaseModel, Field
+# from langchain_core.messages.chat import ChatMessage
+# from langchain_core.runnables.history import RunnableWithMessageHistory
+# from langchain_core.chat_history import BaseChatMessageHistory
+# from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+# from langchain_community.chat_message_histories import ChatMessageHistory
+# from langchain_openai import ChatOpenAI #, OpenAIEmbeddings
 
-# from pydantic import BaseModel, Field
-from langchain_core.messages.chat import ChatMessage
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_openai import ChatOpenAI #, OpenAIEmbeddings
+# from modules.retrieval import create_chain
 
-from modules.retrieval import create_chain
-
-# from langchain_teddynote import logging
+# # from langchain_teddynote import logging
+from openai import OpenAI
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -22,25 +21,12 @@ if "unique_session_id" not in st.session_state:
     import uuid
     st.session_state["unique_session_id"] = str(uuid.uuid4())
 
-# 처음 1번만 실행하기 위한 코드
-if "messages_application" not in st.session_state:
-    # 대화기록을 저장하기 위한 용도로 생성한다.
-    st.session_state["messages_application"] = []
-
-# 처음 1번만 실행하기 위한 코드
-if "messages_application_tutor" not in st.session_state:
-    # 대화기록을 저장하기 위한 용도로 생성한다.
-    st.session_state["messages_application_tutor"] = []
-
-# # 제출 버튼 상태 관리
-# if "submit_button_disabled" not in st.session_state:
-#     st.session_state["submit_button_disabled"] = True
+# 대화 기록 초기화 (적용하기 페이지 전용)
+if "chat_history_applying" not in st.session_state:
+    st.session_state["chat_history_applying"] = []
 
 if "show_answer" not in st.session_state:
     st.session_state["show_answer"] = False
-
-if "feedback_processed" not in st.session_state:
-    st.session_state["feedback_processed"] = False
 
 if "last_submission_time" not in st.session_state:
     st.session_state["last_submission_time"] = 0
@@ -48,13 +34,30 @@ if "last_submission_time" not in st.session_state:
 if "score" not in st.session_state:
     st.session_state["score"] = 0
 
+if "missing_contents" not in st.session_state:
+    st.session_state["missing_contents"] = ""
+
+if "incorrect_contents" not in st.session_state:
+    st.session_state["incorrect_contents"] = ""
+
 # 메인 페이지 하단 리소스 섹션 노출 플래그
 if "show_resources" not in st.session_state:
     st.session_state["show_resources"] = False
 
+if "conversation_completed" not in st.session_state:
+    st.session_state["conversation_completed"] = False
+
+if "completion_balloons_done" not in st.session_state:
+    st.session_state["completion_balloons_done"] = False
+
+if "is_processing" not in st.session_state:
+    st.session_state["is_processing"] = False
+
+if "final_answer_submitted" not in st.session_state:
+    st.session_state["final_answer_submitted"] = False
+
 
 TUTOR_OPENAI_MODEL = "gpt-4.1-mini"
-
 SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -66,32 +69,6 @@ os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
 if not os.path.exists(".cache"):
     os.mkdir(".cache")
 
-# 세션 기록을 저장할 딕셔너리
-store = {} 
-
-# class InMemoryHistory(BaseChatMessageHistory, BaseModel):
-#     """In memory implementation of chat message history."""
-
-#     messages: List[BaseMessage] = Field(default_factory=list)
-
-#     def add_messages(self, messages: List[BaseMessage]) -> None:
-#         """Add a list of messages to the store"""
-#         self.messages.extend(messages)
-
-#     def clear(self) -> None:
-#         self.messages = []
-
-
-# def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
-#     if session_id not in store:
-#         store[session_id] = InMemoryHistory()
-#     return store[session_id]
-
-# def enable_submit_button():
-#     st.session_state["submit_button_disabled"] = False
-
-# def disable_submit_button():
-#     st.session_state["submit_button_disabled"] = True
 
 # 점수를 별 모양으로 변환하는 함수
 def score_to_stars(score):
@@ -113,14 +90,6 @@ def score_to_stars(score):
     else:
         return "⭐⭐⭐⭐⭐"
 
-# 세션 ID를 기반으로 세션 기록을 가져오는 함수
-def get_session_history(session_ids: str) -> BaseChatMessageHistory:
-    print(session_ids)
-    if session_ids not in store:  # 세션 ID가 store에 없는 경우
-        # 새로운 ChatMessageHistory 객체를 생성하여 store에 저장
-        store[session_ids] = ChatMessageHistory()
-    return store[session_ids]  # 해당 세션 ID에 대한 세션 기록 반환
-
 
 ######################################
 ########### Mainpage Logic ###########
@@ -128,50 +97,7 @@ def get_session_history(session_ids: str) -> BaseChatMessageHistory:
 st.title("적용하기 💡")
 st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 좌측 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.")
 
-# @st.fragment
-# def update_progress(progress_value, current_step, total_steps):
-#     st.progress(progress_value, text=f"진행률: {progress_value*100:.0f}% ({current_step}/{total_steps})")
-
-
-# # Progress bar를 우측 상단에 고정
-# with st.sidebar:
-#     st.markdown(
-#         """
-#         <style>
-#         [data-testid="stSidebar"] {
-#             position: fixed;
-#             right: 0;
-#             top: 0;
-#             height: auto;
-#             width: auto;
-#         }
-#         </style>
-#         """,
-#         unsafe_allow_html=True
-#     )
-#     st.markdown("⏳ 적용하기 진행률")
-    
-#     # 진행률 계산: 대화 완료 여부에 따라
-#     if st.session_state.get("show_resources", False) or st.session_state.get("conversation_completed", False):
-#         current_step = 2
-#         total_steps = 2
-#         progress_value = 1.0
-#     elif (len(st.session_state.get("messages_application", [])) > 0 and 
-#         any(msg.role == "user" for msg in st.session_state.get("messages_application", []))):
-#         # 사용자 메시지가 한 번이라도 있으면 50% (즉, 실제로 답변을 제출했을 때만)
-#         current_step = 1
-#         total_steps = 2
-#         progress_value = 0.5
-#     else:
-#         # 아직 시작 전이면 0%
-#         current_step = 0
-#         total_steps = 2
-#         progress_value = 0.0
-    
-#     update_progress(progress_value, current_step, total_steps)    
-
-
-with st.container(border=True):  # border=True로 실선 테두리 추가
+with st.container(border=True):
     st.markdown(body="""
     ## 등속 원운동
 
@@ -181,19 +107,10 @@ with st.container(border=True):  # border=True로 실선 테두리 추가
 
 st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
 
+# 적용 질문
+applyingQuestion = "위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?"
 
-# 처음 1번만 실행하기 위한 코드
-if "messages_application" not in st.session_state:
-    # 대화기록을 저장하기 위한 용도로 생성한다.
-    st.session_state["messages_application"] = []
-
-# 적용 질문(나중엔 DB에서 불러오면 좋을 듯)
-applyingQuestion = """
-마지막으로, 배운 내용을 새로운 상황에 적용해봅시다.\n
-위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?
-"""
-
-# 적용하기 모범답안 (나중엔 DB에서 불러오면 좋을 듯)
+# 적용하기 모범답안 (나중에 DB에서 불러오면 좋을 듯)
 applyingModeledAnswer = [
     "지구가 달에 지구 중심방향으로 향하는 힘(중력)을 작용하고 있어서, 달은 지구 주변을 계속 원운동할 수 있습니다.",
     "지구의 중력이 구심력으로 작용하여 달이 계속 원운동을 할 수 있습니다.",
@@ -203,17 +120,320 @@ applyingModeledAnswer = [
     "지구가 달에 지구 중심 방향으로 중력을 작용하고, 이 힘이 달의 원운동을 가능하게 합니다.",
     "달에 작용하는 지구의 중력(구심력) 때문에 달은 궤도를 이탈하지 않고 계속 공전할 수 있습니다.",
     "달과 지구 사이의 만유인력(중력) 때문에 달이 지구 중심 방향으로 힘을 받아 원운동 하게 됩니다."
-] 
+]
 
 # 핵심 개념(나중엔 DB에서 불러오면 좋을 듯)
 essential_contents = "등속 원운동"
 
+# AI 튜터의 시스템 프롬프트
+TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.
 
+다음 지침을 따라주세요:
+1. 학생이 이해한 부분과 부족한 부분을 파악합니다.
+2. 부족한 부분에 대해 다시 생각해볼 수 있도록 질문이나 힌트를 제공합니다.
+3. ⚠️ **절대 금지**: 정답을 직접 말하거나, 정답 예시를 언급하거나, 정확한 답을 암시하지 마세요.
+4. 학생이 장난스럽거나 부적절한 답변을 하더라도, 교육자로서 차분하고 친절하게 진지한 답변을 권유하세요.
+5. 세 문장을 넘지 않도록 간결하게 대화를 생성하세요.
+6. 이모지를 적절히 사용하여 친근감을 줍니다."""
+
+
+def format_conversation_history():
+    """대화 기록을 텍스트로 포맷팅"""
+    if not st.session_state.chat_history_applying:
+        return ""
+    
+    history_text = "\n\n=== 이전 대화 기록 ===\n"
+    for msg in st.session_state.chat_history_applying:
+        role = "학생" if msg["role"] == "user" else "AI 선생님"
+        history_text += f"{role}: {msg['content']}\n"
+    return history_text
+
+
+def evaluate_answer_with_llm(user_answer):
+    """LLM을 사용하여 학생 답변을 평가하는 함수"""
+    try:
+        client = OpenAI(api_key=st.session_state.api_key)
+        
+        # 정답 예시 목록
+        correct_answers_text = "\n".join([f"- {ans}" for ans in applyingModeledAnswer])
+        
+        # 대화 기록 컨텍스트
+        conversation_history = format_conversation_history()
+        
+        prompt = f"""당신은 물리 교육 평가 전문가입니다. 학생의 답변을 평가해주세요.
+
+문제: {applyingQuestion}
+학생의 현재 답변: {user_answer}
+
+정답으로 인정 가능한 답변 예시들:
+{correct_answers_text}
+
+{conversation_history}
+
+**⚠️ 평가 전 필수: 학생이 실제로 쓴 단어를 정확히 확인하세요!**
+
+**평가 기준 (각 항목을 독립적으로, 단어 단위로 체크):**
+
+1. **중력/힘 언급** 체크:
+   ✅ 명시적 언급: "중력", "만유인력", "힘" 단어가 포함되어 있으면 O
+      → "중력을", "중력이", "중력 작용", "힘이", "힘을" 등 모두 인정
+   ✅ 구심력: "구심력" (있어도 OK, 없어도 OK - 선택적)
+   ⚠️ 암묵적만: "끌어당기다", "당기다"만 있고 구체적 힘 이름 없음 → 불충분
+   ❌ 없음: 어떤 힘도 언급 안 함
+
+2. **방향 언급** 체크:
+   ✅ 있음: "지구 중심", "지구의 중심", "지구 방향", "지구중심" (띄어쓰기 무관)
+   ❌ 틀림: "달 중심", "달의 중심" → 치명적 오류!
+   ❌ 없음: 방향 언급 전혀 없음
+
+3. **원운동 언급** 체크:
+   ✅ 있음: "원운동" 단어가 포함되어 있으면 무조건 O
+      → "원운동해요", "원운동합니다", "원운동을", "원운동한다" 등 모두 인정
+   ✅ 대체 표현: "공전", "돈다", "돌", "궤도" 등도 인정
+   ❌ 없음: 운동 결과 언급 전혀 없음
+
+
+**🎯 평가 예시 (정확히 이 패턴을 따르세요):**
+
+예시 1:
+학생: "달이 지구 중심 방향으로 끌어당겨져서 원운동을 합니다"
+분석: 방향 O, 원운동 O, 중력 △ ("끌어당겨"만으로는 불충분)
+점수: 65점
+놓친개념: [중력, 만유인력 같은 구체적인 힘의 이름]
+피드백: "방향과 운동은 잘 설명했어요! 그런데 달을 끌어당기는 힘은 구체적으로 어떤 힘일까요? 🤔"
+
+예시 2:
+학생: "지구의 중력 때문에 달이 원운동을 합니다"
+분석: 중력 O, 원운동 O, 방향 X
+점수: 70점
+놓친개념: [지구 중심 방향]
+피드백: "중력 개념은 잘 이해하고 있네요! 그런데 그 중력은 어느 방향으로 작용할까요? 🧭"
+
+예시 3:
+학생: "지구가 달에 지구 중심 방향으로 중력을 작용합니다"
+분석: 중력 O, 방향 O, 원운동 X
+점수: 85점
+놓친개념: [원운동]
+피드백: "중력과 방향은 완벽해요! 그런데 이 힘이 달의 운동에 어떤 영향을 주나요? 달이 계속 어떤 운동을 할 수 있게 하나요? 🌙"
+
+예시 4:
+학생: "달이 지구 주위를 계속 돌아요"
+분석: 원운동 O, 중력 X, 방향 X
+점수: 40점
+놓친개념: [중력, 지구 중심 방향으로 작용하는 힘]
+피드백: "달이 지구 주위를 도는 것은 맞아요! 그런데 왜 달이 계속 돌 수 있을까요? 어떤 힘이 작용하고 있을까요? 💪"
+
+예시 5:
+학생: "지구가 달에 지구 중심 방향으로 중력을 작용하고 있어서, 달은 지구 주변을 계속 원운동할 수 있습니다"
+분석: 중력 O, 방향 O, 원운동 O
+점수: 95점
+놓친개념: []
+피드백: "완벽합니다! 모든 핵심 개념을 잘 이해하고 있네요! 👏"
+
+예시 6 (짧은 표현):
+학생: "지구가 달에 지구 중심방향으로 중력을 작용해서 달이 원운동해요"
+분석: 중력 O ("중력을 작용"), 방향 O ("지구 중심방향"), 원운동 O ("원운동해요")
+점수: 95점
+놓친개념: []
+피드백: "완벽합니다! 간결하면서도 모든 핵심을 담았네요! 👏"
+
+예시 7 (띄어쓰기 변형):
+학생: "지구중심방향으로 중력이 작용해서 원운동합니다"
+분석: 중력 O ("중력이"), 방향 O ("지구중심방향"), 원운동 O ("원운동합니다")
+점수: 95점
+놓친개념: []
+피드백: "훌륭해요! 핵심 개념을 정확하게 설명했습니다! 👏"
+
+
+**⚠️ 물리와 무관한 답변 처리 (중요!):**
+
+학생이 물리 개념과 무관한 답변을 하면 **절대로** 평가적 표현을 사용하지 마세요:
+- ❌ 금지: "개념을 담고 있지 않아요", "개념과 연결되지 않았어요", "문제에서 묻는 것이 아니에요"
+- ✅ 필수: **항상 긍정적으로 공감 → 자연스럽게 질문으로 유도**
+
+**상황별 대응 패턴:**
+- 인사말("안녕하세요", "하이") → 인사 받아주고 문제로 유도
+  예) "반가워요! 😊 지금은 달의 운동에 대해 생각해볼 시간이에요. 왜 달이 지구 주위를 계속 돌 수 있을까요?"
+
+- 모르겠다("모르겠어요", "몰라요") → 괜찮다고 하고 쉽게 접근
+  예) "괜찮아요! 천천히 생각해봐요. 🤔 시뮬레이션을 다시 보면서 달이 어떻게 움직이는지 관찰해볼까요?"
+
+- 장난/감탄사("ㅋㅋㅋ", "ㅎㅎㅎ") → 긍정적으로 받아들이고 진지하게 유도
+  예) "재밌나요? 😄 그럼 진지하게 한번 생각해볼까요? 달이 계속 공전하는 이유는 무엇일까요?"
+
+- 짧은 반응("네!", "응", "좋아요") → 의욕 칭찬하고 실제 답변 유도
+  예) "의욕이 넘치네요! 😊 그럼 이제 실제로 답을 생각해볼까요? 달이 지구 주위를 계속 도는 이유는 무엇일까요?"
+
+- 무의미한 글자("ㄴ내내낸", "ㅁㄴㅇㄹ") → 답변을 이해 못했다고 하고 다시 유도
+  예) "답변을 잘 이해하지 못했어요. 🤔 다시 한번 생각해볼까요? 달이 원운동을 하는 이유는 무엇일까요?"
+
+**핵심 원칙: 어떤 답변이든 부정적 평가 없이 긍정적으로 받아들이고, 자연스럽게 문제로 유도하세요.**
+점수는 0-5점, 놓친개념은 [중력, 지구 중심 방향, 원운동]
+
+
+**점수 가이드라인:**
+- 95-100점: 3개 모두 포함 (완벽!)
+- 80-94점: 중력 + 방향 포함 (합격!)
+- 60-79점: 중 1-2개만 포함
+- 40-59점: 1개 또는 매우 불충분
+- 0-39점: 거의 없음 또는 "달 중심" 치명적 오류
+
+
+**🚨 중요 (반드시 준수):**
+1. **단어 포함 여부만 체크**: 
+   - "원운동" 단어가 있으면 → 원운동 O
+   - "중력" 단어가 있으면 → 중력 O
+   - "지구 중심" 또는 "지구중심"이 있으면 → 방향 O
+   - 띄어쓰기, 조사(-을/-를/-이/-가/-해요/-합니다) 무관!
+
+2. **"구심력"은 선택적** → missing_contents에 절대 포함 금지!
+
+3. **"끌어당기다"만으로는 불충분** → "중력" 같은 구체적 힘 이름 필요
+
+4. **피드백은 학생이 쓴 단어를 활용**하고, 부족한 부분을 질문으로 유도
+
+
+다음 형식으로만 답변해주세요:
+판정: [정답/오답/부분정답]
+점수: [0-100]
+놓친개념: [학생이 쓰지 않은 필수 개념만, 구심력은 절대 포함 금지. 없으면 빈 괄호만 표시: []]
+잘못된개념: [달 중심 같은 물리적 오류만. 없으면 빈 괄호만 표시: []]
+피드백: [위 예시 패턴을 따라, 구체적이고 질문 형태로, 세 문장 이내]"""
+
+        response = client.chat.completions.create(
+            model=TUTOR_OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": TUTOR_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=400
+        )
+        
+        evaluation = response.choices[0].message.content
+        print("=== LLM 평가 결과 ===")
+        print(evaluation)
+        print("=" * 50)
+        
+        # 파싱
+        lines = evaluation.split("\n")
+        is_correct = "정답" in lines[0]
+        score = 0
+        missing = ""
+        incorrect = ""
+        feedback = ""
+        
+        for line in lines:
+            if line.startswith("점수:"):
+                try:
+                    score = int(line.split(":")[1].strip())
+                except:
+                    score = 0
+            elif line.startswith("놓친개념:"):
+                missing = line.split(":", 1)[1].strip()
+            elif line.startswith("잘못된개념:"):
+                incorrect = line.split(":", 1)[1].strip()
+            elif line.startswith("피드백:"):
+                feedback = line.split(":", 1)[1].strip()
+        
+        # 여러 줄 피드백 처리
+        if not feedback:
+            feedback_start = False
+            feedback_lines = []
+            for line in lines:
+                if line.startswith("피드백:"):
+                    feedback_start = True
+                    feedback_lines.append(line.split(":", 1)[1].strip())
+                elif feedback_start and line.strip():
+                    feedback_lines.append(line.strip())
+            feedback = "\n".join(feedback_lines)
+        
+        return is_correct, score, missing, incorrect, feedback
+        
+    except Exception as e:
+        st.error(f"답변 평가 중 오류: {str(e)}")
+        return False, 0, "", "", "평가 중 오류가 발생했습니다."
+
+
+def add_message_to_history(role, content):
+    """대화 내용을 히스토리에 추가하는 함수"""
+    message = {"role": role, "content": content}
+    st.session_state.chat_history_applying.append(message)
+
+
+def display_chat_history():
+    """대화 기록을 화면에 표시하는 함수"""
+    for message in st.session_state.chat_history_applying:
+        if message["role"] == "assistant":
+            with messages.chat_message(message["role"], avatar=SIDEBAR_AI_AVATAR):
+                st.write(message["content"])
+        else:
+            with messages.chat_message(message["role"]):
+                st.write(message["content"])
+
+
+def process_answer(user_input):
+    """답변을 처리하는 함수"""
+    # 처리 중 플래그 설정
+    if st.session_state["is_processing"]:
+        return
+    
+    st.session_state["is_processing"] = True
+    
+    # 사용자 입력을 먼저 대화 기록에 추가
+    add_message_to_history("user", f"(제출한 답변): {user_input}")
+    
+    # End 상태면 입력을 처리하지 않음
+    if st.session_state.get("conversation_completed", False):
+        st.session_state["is_processing"] = False
+        return
+    
+    # AI 응답 생성 중 상태 표시
+    with status_container:
+        st.info("🤔 AI가 답변을 평가하고 있습니다...")
+    
+    # LLM을 사용한 답변 평가
+    is_correct, score, missing, incorrect, ai_feedback = evaluate_answer_with_llm(user_input)
+    
+    # 세션 상태 업데이트
+    st.session_state["score"] = score
+    st.session_state["missing_contents"] = missing
+    st.session_state["incorrect_contents"] = incorrect
+    
+    # 점수에 따른 처리
+    if score >= 80:
+        # 정답! 완료 메시지
+        stars = "⭐⭐⭐⭐⭐"
+        completion_msg = f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
+        
+        # missing_contents가 실제로 있는 경우만 표시
+        missing_clean = missing.strip().strip("[]").strip()
+        if missing_clean and missing_clean.lower() not in ["없음", "none", ""]:
+            completion_msg += f"\n\n지금 답변에서 [{missing_clean}] 도 고려하면 더 완벽한 답변이 될 거예요."
+        
+        completion_msg += "\n\n메인 화면의 답변 작성란에 최종 답안을 다시 작성해보세요!"
+        
+        add_message_to_history("assistant", completion_msg)
+        
+        # 대화 종료 플래그 설정
+        st.session_state["conversation_completed"] = True
+    else:
+        # 80점 미만 - 피드백 제공
+        stars = score_to_stars(score)
+        feedback_msg = f"**현재 점수: {stars}**\n\n{ai_feedback}"
+        add_message_to_history("assistant", feedback_msg)
+    
+    # 상태 메시지 제거
+    status_container.empty()
+    st.session_state["is_processing"] = False
+    st.rerun()
+
+
+# 메인 화면
 if not st.session_state.get("show_resources", False):
-
     # 메인 화면에 질문 표시
     st.markdown("**문제 상황**")
-    st.markdown("위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?")
+    st.markdown(applyingQuestion)
 
     # text_area의 키보드 단축키 힌트 숨기기
     st.markdown(
@@ -234,40 +454,58 @@ if not st.session_state.get("show_resources", False):
         unsafe_allow_html=True
     )
 
-    # 답변 입력 영역
-    text_area_key = st.session_state.get("text_area_key", 0)
-    reason = st.text_area(
-        label="내 답변을 작성해주세요.",
-        height=200,
-        key=f"text_area_{text_area_key}"
-    )
-
-    # if not reason:
-    #     disable_submit_button()
-
-    submit_button = st.button(
-        label="제출하기",
-        type="primary",
-        use_container_width=True
-    )
-
-    if submit_button:
-        import time
-        current_time = time.time()
+    # 최종 답안 제출 완료 후 "더 알아보기" 버튼 표시 (메인 화면)
+    if st.session_state.get("final_answer_submitted", False) and not st.session_state.get("show_resources", False):
+        # 풍선 효과 (한 번만)
+        if not st.session_state.get("completion_balloons_done", False):
+            st.balloons()
+            st.session_state["completion_balloons_done"] = True
         
-        # 답변이 비어있으면 경고
-        if not reason or not reason.strip():
-            st.warning("답변을 작성해주세요.")
-        # 같은 답변이 연속으로 제출되는 것을 방지 (5초 이내 중복 제출 방지)
-        elif current_time - st.session_state.get("last_submission_time", 0) < 5:
-            st.warning("잠시 후 다시 시도해주세요.")
-        else:
-            st.session_state["explanation_user_reason"] = reason
-            st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
-            st.session_state["feedback_processed"] = False  # 피드백 처리 플래그 리셋
-            st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1  # text_area 키 변경
-            st.session_state["last_submission_time"] = current_time  # 제출 시간 기록
-            st.success("제출 완료! 좌측 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
+        st.markdown("---")
+        st.markdown("### 🎉 축하합니다! '더 알아보기' 버튼을 눌러 비슷한 사례를 확인하고 오늘 수업을 마무리해보세요")
+        if st.button("📚 더 알아보기", type="primary", use_container_width=True, key="main_show_resources_button"):
+            st.session_state["show_resources"] = True
+            st.rerun()
+    
+    # 답변 입력 영역 표시 (대화가 완료되지 않았거나, 완료되었지만 최종 답안을 아직 제출하지 않은 경우)
+    elif not st.session_state.get("final_answer_submitted", False):
+        # 답변 입력 영역
+        text_area_key = st.session_state.get("text_area_key", 0)
+        reason = st.text_area(
+            label="내 답변을 작성해주세요.",
+            height=200,
+            key=f"text_area_{text_area_key}"
+        )
+
+        submit_button = st.button(
+            label="제출하기",
+            type="primary",
+            use_container_width=True
+        )
+
+        if submit_button:
+            current_time = time.time()
+            
+            # 답변이 비어있으면 경고
+            if not reason or not reason.strip():
+                st.warning("답변을 작성해주세요.")
+            # 같은 답변이 연속으로 제출되는 것을 방지 (5초 이내 중복 제출 방지)
+            elif current_time - st.session_state.get("last_submission_time", 0) < 5:
+                st.warning("잠시 후 다시 시도해주세요.")
+            else:
+                # 대화 완료 상태에서 제출 = 최종 답안 재제출
+                if st.session_state.get("conversation_completed", False):
+                    st.session_state["final_answer_submitted"] = True
+                    st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1
+                    st.session_state["last_submission_time"] = current_time
+                    st.rerun()
+                else:
+                    # 일반 제출
+                    st.session_state["last_user_input"] = reason
+                    st.session_state["submission_triggered"] = True
+                    st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1
+                    st.session_state["last_submission_time"] = current_time
+                    st.success("제출 완료! 좌측 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
 
 # 메인 하단 리소스 섹션
 if st.session_state.get("show_resources", False):
@@ -286,330 +524,29 @@ if st.session_state.get("show_resources", False):
 
 
 #####################################
-########### Sibebar Logic ###########
+########### Sidebar Logic ###########
 #####################################
 with st.sidebar:
-
     st.write("**AI 선생님**의 피드백")
     messages = st.container(height=400)
-    ai_info = st.empty()
+    status_container = st.empty()
 
-    # 답변 체인 생성
-    def create_chain(model_name=TUTOR_OPENAI_MODEL):
-        # First chain for relevance checking
-        relevance_check_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    """You are a grader assessing the relevance of a student's essay answer to given model answers. 
-                    Here are acceptable model answers (student's answer should match any of these):
-                    {applyingModeledAnswer}
+    # 초기 메시지 추가 (한 번만)
+    if len(st.session_state.chat_history_applying) == 0:
+        add_message_to_history("assistant", "마지막으로, 배운 내용을 새로운 상황에 적용해봅시다.")
 
-                    Consider both the student's current answer and their previous responses in the conversation history to evaluate their understanding.
-                    
-                    **Important Notes:**
-                    - "구심력(centripetal force)" is an OPTIONAL advanced term. Students can explain correctly without using this term.
-                    - As long as the student mentions "중력(gravity)" acting "towards the center" or "pulling towards Earth", the answer is complete.
-                    - Only mark concepts as missing if they are ESSENTIAL to understanding circular motion (e.g., force, direction toward center, circular motion).
-                    - Do NOT list "구심력" in missing_contents unless the student's answer completely lacks the concept of center-directed force.
-                    
-                    Evaluation criteria:
-                    1. Accuracy and relevance compared to the model answer
-                    2. Physical correctness: Whether the student's answer is physically accurate and follows proper physics principles
-                    3. Progressive improvement in understanding and Integration of previous responses with new insights shown through the conversation
-                    
-                    Combine the current input and conversation history to form a complete understanding of the student's answer.
-                    Then compare this combined answer against the model answer.
-                    
-                    Analyze the matching and non-matching content between the student's answer and the model answer.
-                    
-                    Return your response in the following format:
-                    score: [0-100 double type relevance score]
-                    missing_contents: [List missing concepts]
-                    incorrect_contents: [List incorrect concepts]"""
-                ),
-                MessagesPlaceholder(variable_name="history"),
-                ("human", "{input}"),
-                ("ai", "Based on both the current answer and previous responses, provide the analysis in the specified format."),
-            ]
-        )
+    # 채팅 히스토리 표시
+    display_chat_history()
 
-        # Second chain for scaffolding
-        scaffolding_prompt = ChatPromptTemplate.from_messages(
-            [
-                ( ##지금 핵심 교육 전략 부분이 나와도 5단계에서의 학생 답변이 맞으면 넘어가는 방식이라서 대화를 안 하게 됨!!!
-                    "system",
-                    """당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.  
-
-                    **목표:** 학생이 새로 익힌 [핵심 개념]과 관련된 개념을 새로운 [문제 상황]에 적용하고, 이를 통해 개념의 유용성을 탐구하며 반성적 사고를 할 수 있도록 대화를 통해 돕습니다.
-
-                    **핵심 교육 전략:**
-                        학생이 개별 사례를 넘어서 원리를 일반화하도록 유도하세요:
-                            - 학생이 특정 개념을 이해했다면, 다른 유사한 상황에서도 같은 원리가 적용되는지 탐구하도록 질문하세요.
-                            - 예: "달뿐만 아니라 인공위성, 심지어 태양을 도는 지구까지 모두 비슷한 원리로 궤도를 유지해요. 이들의 공통적인 특징은 무엇일까요?"
-                            - 예: "우리 주변의 원운동을 찾아볼까요? 놀이공원의 회전 그네, 끈에 매달린 공을 돌리는 것, 달의 공전 - 이 세 가지가 모두 같은 물리 원리로 설명될 수 있다고 생각하나요?"
-                            - 학생이 배운 개념을 새로운 맥락에 적용할 수 있도록 격려하고, 공통된 원리를 발견하도록 안내하세요.
-
-                    **중요:** 다음 규칙을 반드시 따르세요.
-                    1. 세 문장을 넘지 않도록 대화를 생성하세요.  
-                    2. ⚠️ **절대 금지**: 정답이나 지나친 암시를 제공하지 마세요. [모범 답안]은 평가 기준으로만 사용하고, 학생에게 직접 알려주지 마세요.
-                    3. 만약 학생의 답변에 [놓친 개념]이 있다면, [놓친 개념]을 질문 형태로 간접적으로 제시해주고, 이를 포함하여 정확하게 답변해달라고 요청하세요.
-                    4. 만약 학생의 답변에 [잘못된 개념]이 있다면 
-                        - [잘못된 개념]에 대해 직접적으로 말하지 말고, 학생이 스스로 탐색할 수 있도록 열린 질문을 통해 [잘못된 개념]에 불만족을 가질 수 있도록 반례를 들어 학생과 문답하세요.
-                        - 만약 [잘못된 개념]에 대하여 3회 이상 문답했지만 계속 [잘못된 개념]을 고수하는 경우에는 올바른 과학적 개념을 알려주세요.
-                    5. 학생이 장난스럽거나 부적절한 답변을 하더라도, 교육자로서 차분하고 친절하게 진지한 답변을 권유하세요. 
-                       
-
-                    [답변 점수]: {score}
-                    [문제 상황]: {applyingQuestion}
-                    [모범 답안]: {applyingModeledAnswer}
-                    [놓친 개념]: {missing_contents}
-                    [잘못된 개념]: {incorrect_contents}
-                    [핵심 개념]: {essential_contents}
-                    """
-                ),
-                # 대화 기록을 변수로 사용, history 가 MessageHistory 의 key 가 됨
-                MessagesPlaceholder(variable_name="history"),
-                ("human", "{input}"),
-            ]
-        )
-
-        llm = ChatOpenAI(model_name=model_name, temperature=0.1, openai_api_key = st.session_state.api_key)
-
-        def process_input(user_input, is_init=False):
-
-            # First, get the relevance check
-            relevance_chain = RunnableWithMessageHistory(
-                relevance_check_prompt | llm,
-                get_session_history,
-                input_messages_key="input",
-                history_messages_key="history",
-            )
-            
-            relevance_check_response = relevance_chain.invoke(
-                {"input": user_input, "applyingModeledAnswer": applyingModeledAnswer},
-                config={"configurable": {"session_id": st.session_state["unique_session_id"]}}
-            )
-            
-            # Parse the response
-            response_text = relevance_check_response.content
-            print(response_text)
-            # Extract score
-            score_match = re.search(r'score:\s*(\d+\.?\d*)', response_text)
-            score = float(score_match.group(1)) if score_match else 0
-            st.session_state["score"] = score
-            
-            # Extract missing contents
-            missing_match = re.search(r'missing_contents:\s*\[(.*?)\]', response_text, re.DOTALL)
-            missing_contents = missing_match.group(1).strip() if missing_match else ""
-            
-            # Extract incorrect contents
-            incorrect_match = re.search(r'incorrect_contents:\s*\[(.*?)\]', response_text, re.DOTALL)
-            incorrect_contents = incorrect_match.group(1).strip() if incorrect_match else ""
-            
-            # Now get the scaffolding response
-            scaffolding_chain = RunnableWithMessageHistory(
-                scaffolding_prompt | llm,
-                get_session_history,
-                input_messages_key="input",
-                history_messages_key="history",
-            )
-            
-            # Store missing_contents in session state
-            st.session_state["missing_contents"] = missing_contents
-            
-            # Return streaming response
-            return scaffolding_chain.stream(
-                {
-                    "input": user_input,
-                    "applyingQuestion": applyingQuestion,
-                    "applyingModeledAnswer": applyingModeledAnswer,
-                    "score": score,
-                    "missing_contents": missing_contents,
-                    "incorrect_contents": incorrect_contents,
-                    "essential_contents": essential_contents
-                },
-                config={"configurable": {"session_id": st.session_state["unique_session_id"]}}
-            )
-        
-        return process_input
-
-    # 이전 대화를 출력
-    def print_messages():
-        for chat_message in st.session_state["messages_application"]:
-            if chat_message.role == "assistant":
-                messages.chat_message(chat_message.role, avatar=SIDEBAR_AI_AVATAR).write(chat_message.content)
-            else:
-                messages.chat_message(chat_message.role).write(chat_message.content)
-
-    # 새로운 메시지를 추가
-    def add_message(role, message):
-        st.session_state["messages_application"].append(ChatMessage(role=role, content=message))
-
-    # 이전 대화 기록 출력
-    print_messages()
-
-    # 체인 생성
-    if "application_chain" not in st.session_state:
-        st.session_state["application_chain"] = create_chain()
-
-    chain = st.session_state["application_chain"]
-
-    # 제출된 답변에 대한 피드백 처리 (한 번만 실행)
-    if (st.session_state.get("explanation_submission_triggered", False) and 
-        "explanation_user_reason" in st.session_state and 
-        not st.session_state.get("feedback_processed", False)):
-
-        # 즉시 상태 리셋하여 무한 루프 방지
-        st.session_state["explanation_submission_triggered"] = False
-        st.session_state["feedback_processed"] = True
-
-        # 사용자의 제출된 답변 표시
-        messages.chat_message("user").write(f"(제출한 답변): {st.session_state['explanation_user_reason']}")
-
-        # AI 피드백 생성 (스트리밍) - 스피너와 함께
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
-            response_stream = chain(st.session_state['explanation_user_reason'], False)
-            
-            streamed_text = ""
-            feedback_placeholder = None
-            # 대화가 완료되지 않은 경우에만 AI 응답 표시
-            if not st.session_state.get("conversation_completed", False):
-                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
-                    # 별 모양 표시 (점수 기반)
-                    stars = score_to_stars(st.session_state.get("score", 0))
-                    st.markdown(f"**현재 점수: {stars}**")
-                    
-                    feedback_placeholder = st.empty()
-                    
-                    # 스트리밍 응답 처리
-                    for chunk in response_stream:
-                        if hasattr(chunk, 'content'):
-                            streamed_text += chunk.content
-                            feedback_placeholder.markdown(streamed_text)
-                            time.sleep(0.02)
-
-        # 사용자 메시지는 항상 대화 기록에 추가
-        add_message("user", f"(제출한 답변): {st.session_state['explanation_user_reason']}")
-
-        # relevance score 확인 후 처리
-        try:
-            # 80% 이상 달성 시 → 일반 피드백은 화면에서 지우고 완료 메시지만 표시
-            if st.session_state["score"] >= 80:
-                # 방금 표시한 일반 피드백 지우기
-                if feedback_placeholder:
-                    feedback_placeholder.empty()
-                
-                with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
-                    st.markdown(f"**현재 점수: ⭐⭐⭐⭐⭐**")
-                    st.write("축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.")
-                    st.markdown("   [**" + f"{applyingModeledAnswer[0]}"+"**]")
-                    if len(st.session_state['missing_contents']) > 0:
-                        missing_text = ''.join(st.session_state['missing_contents']).strip()
-                        if missing_text:  # 빈 문자열이 아닌 경우에만 출력
-                            st.write(f"   지금 답변에서 [{missing_text}] 도 고려하면 더 완벽한 답변이 될 거예요.")
-                    st.write("오늘 수업은 여기까지입니다. 아래 버튼을 클릭하여 메인 화면에서 더 알아보기 자료를 확인해보세요!")
-                
-                # 완료 메시지를 대화 기록에 추가 (별 5개 포함)
-                completion_msg = f"**현재 점수: ⭐⭐⭐⭐⭐**\n\n축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
-                if len(st.session_state['missing_contents']) > 0:
-                    missing_text = ''.join(st.session_state['missing_contents']).strip()
-                    if missing_text:
-                        completion_msg += f"\n\n지금 답변에서 [{missing_text}] 도 고려하면 더 완벽한 답변이 될 거예요."
-                completion_msg += "\n\n오늘 수업은 여기까지입니다. 아래 버튼을 클릭하여 메인 화면에서 더 알아보기 자료를 확인해보세요!"
-                add_message("assistant", completion_msg)
-                
-                # 대화 종료 플래그 설정 (리소스 섹션은 버튼 클릭 시 노출)
-                st.session_state["conversation_completed"] = True
-                st.rerun()
-            else:
-                # 80점 미만이면 일반 피드백을 대화 기록에 추가 (별 모양 포함)
-                stars = score_to_stars(st.session_state.get("score", 0))
-                add_message("assistant", f"**현재 점수: {stars}**\n\n{streamed_text}")
-            
-        except (ValueError, TypeError) as e:
-            st.error(f"처리 중 오류가 발생했습니다: {e}")
-
-
-    # 초기 질문 표시 (제출 전에만)
-    elif len(st.session_state["messages_application"]) == 0:
-        # Display the question directly
-        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("마지막으로, 배운 내용을 새로운 상황에 적용해봅시다.")
-        
-        # Add the question to history
-        add_message("assistant", "마지막으로, 배운 내용을 새로운 상황에 적용해봅시다.")
-
+    # 제출 트리거 처리
+    if st.session_state.get("submission_triggered", False):
+        st.session_state["submission_triggered"] = False
+        if "last_user_input" in st.session_state:
+            process_answer(st.session_state["last_user_input"])
+    
     # 사이드바 채팅 입력창 (대화가 시작되었고 아직 완료되지 않은 경우)
-    if (len(st.session_state["messages_application"]) > 0 and 
+    if (len(st.session_state.chat_history_applying) > 0 and 
         not st.session_state.get("conversation_completed", False)):
         
         if user_input := st.chat_input("AI 선생님과 대화를 계속하세요...", key="sidebar_chat_input"):
-            # 사용자 메시지 추가
-            add_message("user", user_input)
-            
-            # AI 응답 생성
-            with st.spinner("AI가 답변을 생성하고 있습니다..."):
-                response_stream = chain(user_input, False)
-                
-                streamed_text = ""
-                for chunk in response_stream:
-                    if hasattr(chunk, 'content'):
-                        streamed_text += chunk.content
-            
-            # 점수 확인 및 완료 처리
-            try:
-                if st.session_state.get("score", 0) >= 80:
-                    # 완료 메시지만 대화 기록에 추가 (별 5개 포함)
-                    completion_message = f"""**현재 점수: ⭐⭐⭐⭐⭐**
-
-축하합니다! 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.
-
-[**{applyingModeledAnswer[0]}**]"""
-                    
-                    if len(st.session_state.get('missing_contents', '')) > 0:
-                        missing_text = ''.join(st.session_state['missing_contents']).strip()
-                        if missing_text:
-                            completion_message += f"\n\n지금 답변에서 [{missing_text}] 도 고려하면 더 완벽한 답변이 될 거예요."
-                    
-                    completion_message += "\n\n오늘 수업은 여기까지입니다. 아래 버튼을 클릭하여 메인 화면에서 더 알아보기 자료를 확인해보세요!"
-                    
-                    add_message("assistant", completion_message)
-                    
-                    # 대화 종료 플래그 설정 (리소스 섹션은 버튼 클릭 시 노출)
-                    st.session_state["conversation_completed"] = True
-                else:
-                    # 80점 미만이면 일반 피드백을 대화 기록에 추가 (별 모양 포함)
-                    stars = score_to_stars(st.session_state.get("score", 0))
-                    add_message("assistant", f"**현재 점수: {stars}**\n\n{streamed_text}")
-                    
-            except (ValueError, TypeError) as e:
-                st.error(f"처리 중 오류가 발생했습니다: {e}")
-            
-            # 화면 새로고침으로 새 메시지 표시
-            st.rerun()
-    
-    # 대화 완료 후 "더 알아보기" 버튼 표시
-    if (st.session_state.get("conversation_completed", False) and 
-        not st.session_state.get("show_resources", False)):
-        # 버튼이 처음 표시될 때 한 번만 풍선 효과
-        if not st.session_state.get("completion_balloons_done", False):
-            st.balloons()
-            st.session_state["completion_balloons_done"] = True
-        
-        st.markdown("---")
-        if st.button("📚 더 알아보기", type="primary", use_container_width=True, key="show_resources_button"):
-            st.session_state["show_resources"] = True
-            st.rerun()
-
-# Create columns with specific ratios
-col1, col2, col3 = st.columns([5, 2, 2])
-
-# # Place the button in the last column
-# with col1:
-#     if st.button(
-#         label="이전단계로",
-#         icon="⏪",
-#         help="돌아보기로 이동하기",
-#         type="primary"
-#     ):
-#         st.switch_page("pages_group/04_돌아보기.py")
+            process_answer(user_input)

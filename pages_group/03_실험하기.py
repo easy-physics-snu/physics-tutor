@@ -101,6 +101,7 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
 ######################################
 ########### Mainpage Logic ###########
 ######################################
+st.set_page_config(layout="wide")
 
 st.title("실험하기 🧪")
 
@@ -279,7 +280,7 @@ with st.container(border=True):
         with open('circular-motion-sim_responsive.html', 'r', encoding='utf-8') as f:
             circular_html_content = f.read()
         
-        components.html(circular_html_content, height=1040, width=675, scrolling=False)
+        components.html(circular_html_content, height=590, width=870, scrolling=False)
 
         st.markdown("""
         <style>

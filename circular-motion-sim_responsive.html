@@ -268,15 +268,16 @@
   min-width: 280px;
 }
 
-/* Stack vertically on smaller widths */
+/* Keep horizontal layout at all screen sizes */
 @media (max-width: 1150px) {
   #container {
-    flex-direction: column;
-    align-items: center;
+    gap: clamp(10px, 1.5vw, 20px);
   }
   #controls {
-    width: 100%;
-    min-width: 0;
+    min-width: 250px;
+  }
+  #myCanvas {
+    max-width: calc(100% - 280px);
   }
   .buttons {
     display: flex;

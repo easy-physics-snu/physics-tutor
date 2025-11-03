@@ -331,3 +331,30 @@ def ensure_canvas_image_loaded(image_path, target_size=(500, 500)):
     except Exception as e:
         print(f"캔버스 이미지 로딩 확인 실패: {str(e)}")
         return False
+
+
+def print_logs(log):
+    print("--------\n")
+    for msg in log:
+        print(msg)
+    print("--------\n")
+
+
+def generate_messages(conversation_history, student_prompt, system_msg):
+
+    messages = [{"role": "system", "content": system_msg}]
+    
+    def _to_message(m):
+        # LangChain ChatMessage 지원
+        if hasattr(m, "role") and hasattr(m, "content"):
+            return {"role": m.role, "content": m.content}
+        # dict 형태 지원
+        if isinstance(m, dict):
+            return {"role": m.get("role"), "content": m.get("content")}
+        # 기타 타입 방어
+        return {"role": "user", "content": str(m)}
+
+    messages.extend([_to_message(m) for m in conversation_history])
+    messages.append({"role": "user", "content": student_prompt})
+
+    return messages

@@ -1,3 +1,4 @@
+from errno import ESHLIBVERS
 import os
 import asyncio
 import streamlit as st
@@ -7,12 +8,14 @@ from datetime import datetime
 # from streamlit_drawable_canvas import st_canvas
 from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
+from openai import OpenAI as OpenAI_Client
 
 from modules.multimodal import MultiModalwithHistory
 # from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
-
 from modules.prompts import PEER_AI_02THINK_PROMPT
+
+import dms.Intermediary as Intermediary
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -76,6 +79,15 @@ if "show_predict_input" not in st.session_state:
 # '다음단계로' 버튼 표시 여부를 영구적으로 기록
 if "can_proceed_to_next" not in st.session_state:
     st.session_state["can_proceed_to_next"] = False
+
+if "phase2_intermediary" not in st.session_state:
+    st.session_state["phase2_intermediary"] = None
+
+if "phase2_act_history" not in st.session_state:
+    st.session_state["phase2_act_history"] = []
+
+if "phase2_assess_history" not in st.session_state:
+    st.session_state["phase2_assess_history"] = []
 
 # 비동기 체인 생성
 async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
@@ -336,10 +348,33 @@ with st.sidebar:
         st.session_state["submission_in_progress"] = True
         
         # 사용자의 입력
-        messages.chat_message("user").write(f"(제출한 답변): {st.session_state['predict_user_reason']}")
+        user_submit_input = f"(제출한 답변): {st.session_state['predict_user_reason']}"
+        messages.chat_message("user").write(user_submit_input)
 
         # 비동기 처리를 위한 placeholder
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
+
+            # Intermediary 로직 추가
+            if st.session_state["phase2_intermediary"] is None:
+                intermediary = Intermediary.Intermediary(
+                    client=OpenAI_Client(api_key=st.session_state.api_key),
+                    model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    phase=2,
+                    act_history=st.session_state.get("phase2_act_history", []),
+                    assessment_history=st.session_state.get("phase2_assess_history", [])
+                )
+                st.session_state["phase2_intermediary"] = intermediary
+            else:
+                intermediary = st.session_state["phase2_intermediary"]
+            
+            prompt, acts, assessment = intermediary.get_prompt(
+                conversation_history=st.session_state["messages_predict"],
+                student_prompt=user_submit_input
+            )
+
+            st.session_state["phase2_act_history"] = intermediary.get_act_history()
+            st.session_state["phase2_assess_history"] = intermediary.get_assess_history()
+
             # 비동기 이벤트 루프 실행
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -353,7 +388,7 @@ with st.sidebar:
                 response = loop.run_until_complete(
                     handle_submission_async(
                         image_filepath,
-                        f"<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}", 
+                        f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}", 
                         system_prompt,
                         selected_model
                     )
@@ -405,22 +440,62 @@ with st.sidebar:
 
 
     # 만약에 사용자 입력이 들어오면...
-    if user_input and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", True)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", True)):
+    if user_input: # and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", True)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", True)):
         # 비동기 처리
+        
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
+
+            # 사용자의 입력
+            messages.chat_message("user").write(user_input)
+
+            if st.session_state["phase2_intermediary"] is None:
+                intermediary = Intermediary.Intermediary(
+                    client=OpenAI_Client(api_key=st.session_state.api_key),
+                    model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    phase=2,
+                    act_history=st.session_state.get("phase2_act_history", []),
+                    assessment_history=st.session_state.get("phase2_assess_history", [])
+                )
+                st.session_state["phase2_intermediary"] = intermediary
+            else:
+                intermediary = st.session_state["phase2_intermediary"]
+            
+            prompt, acts, assessment = intermediary.get_prompt(
+                conversation_history=st.session_state["messages_predict"],
+                student_prompt=user_input
+            )
+
+            st.session_state["phase2_act_history"] = intermediary.get_act_history()
+            st.session_state["phase2_assess_history"] = intermediary.get_assess_history()
+
+            # print(f"prompt: {prompt}")
+            # print(f"acts: {acts}")
+            # print(f"assessment: {assessment}")
+
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
+            # act_history = intermediary.get_act_history()
+            # assess_history = intermediary.get_assess_history()
+
+            # st.write("act_history (행동 기록):")
+            # st.write(act_history)
+            # st.write("assess_history (평가 기록):")
+            # st.write(assess_history)
+
             try:
-                # 이미지 파일을 처리
-                image_filepath = None
+                # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
+                image_filepath = process_png_to_bytesio(st.session_state["explanation_saved_image_path"])
+
                 # 답변 요청 (비동기)
                 response = loop.run_until_complete(
-                    generate_answer_async(image_filepath, system_prompt, user_input, selected_model)
+                    generate_answer_async(
+                        image_filepath,
+                        system_prompt,
+                        prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input,
+                        selected_model
+                    )
                 )
-
-                # 사용자의 입력
-                messages.chat_message("user").write(user_input)
 
                 with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
@@ -439,10 +514,10 @@ with st.sidebar:
                 else:
                     st.error("AI 답변 생성에 실패했습니다.")
 
-                if st.session_state.get("toggle_recommended_questions", True):
-                    kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
-                    placeholder1.button(label=kw_1, use_container_width=True)
-                    placeholder2.button(label=kw_2, use_container_width=True)
+                # if st.session_state.get("toggle_recommended_questions", True):
+                #     kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
+                #     placeholder1.button(label=kw_1, use_container_width=True)
+                #     placeholder2.button(label=kw_2, use_container_width=True)
                 
             except Exception as e:
                 st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")

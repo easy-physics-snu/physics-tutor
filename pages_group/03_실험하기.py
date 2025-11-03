@@ -4,13 +4,16 @@ import io
 import time
 import sys
 import base64
+import uuid
+import json
 import streamlit as st
 import streamlit.components.v1 as components
 from typing import List
 from PIL import Image
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, BaseMessage
+from openai import OpenAI as OpenAI_Client
+from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
 from langchain_core.globals import set_verbose
 from langchain_core.messages.chat import ChatMessage
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -26,6 +29,7 @@ from langchain_openai import ChatOpenAI
 # import simulation.simulation as simulation
 
 from modules.prompts import PEER_AI_03EXPERIMENT_PROMPT
+import dms.Intermediary as Intermediary
 
 set_verbose(False)
 
@@ -59,6 +63,19 @@ if "tutor_messages" not in st.session_state:
 # '다음단계로' 버튼 표시 여부를 영구적으로 기록
 if "can_proceed_to_next" not in st.session_state:
     st.session_state["can_proceed_to_next"] = False
+
+if "phase3_intermediary" not in st.session_state:
+    st.session_state["phase3_intermediary"] = None
+
+if "phase3_act_history" not in st.session_state:
+    st.session_state["phase3_act_history"] = []
+
+if "phase3_assess_history" not in st.session_state:
+    st.session_state["phase3_assess_history"] = []
+
+# 고유한 세션 ID 생성 (Streamlit 세션별로 고유)
+if "chain_session_id" not in st.session_state:
+    st.session_state["chain_session_id"] = str(uuid.uuid4())
 
 
 def enalble_submit_button():
@@ -96,6 +113,36 @@ def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
     if session_id not in store:
         store[session_id] = InMemoryHistory()
     return store[session_id]
+
+def sync_history_to_store(session_id: str, tutor_messages: List[ChatMessage]):
+    """st.session_state의 tutor_messages를 RunnableWithMessageHistory의 히스토리 저장소에 동기화
+    
+    RunnableWithMessageHistory는 자동으로 새로운 메시지를 히스토리에 추가하므로,
+    기존 히스토리가 tutor_messages와 동기화되지 않은 경우에만 업데이트합니다.
+    """
+    history = get_by_session_id(session_id)
+    existing_messages = history.messages
+    existing_count = len(existing_messages)
+    tutor_count = len(tutor_messages)
+    
+    # 히스토리와 tutor_messages가 일치하지 않는 경우 동기화
+    # RunnableWithMessageHistory가 자동으로 메시지를 추가하므로,
+    # existing_count는 tutor_count보다 작거나 같을 수 있습니다
+    if existing_count < tutor_count:
+        # 누락된 메시지만 추가
+        for msg in tutor_messages[existing_count:]:
+            if msg.role == "user":
+                history.add_messages([HumanMessage(content=msg.content)])
+            elif msg.role == "assistant":
+                history.add_messages([AIMessage(content=msg.content)])
+    elif existing_count == 0 and tutor_count > 0:
+        # 히스토리가 비어있고 tutor_messages가 있는 경우 전체 동기화
+        history.clear()
+        for msg in tutor_messages:
+            if msg.role == "user":
+                history.add_messages([HumanMessage(content=msg.content)])
+            elif msg.role == "assistant":
+                history.add_messages([AIMessage(content=msg.content)])
 
 
 ######################################
@@ -296,12 +343,51 @@ with st.container(border=True):
 #####################################
 ########### Sibebar Logic ###########
 #####################################
+def get_phase2_learning_context():
+    """Phase2에서 겪은 학습자의 어려움을 요약하여 context 문자열로 반환"""
+    phase2_assess_history = st.session_state.get("phase2_assess_history", [])
+    
+    if not phase2_assess_history:
+        return ""
+    
+    # JSON 문자열들을 파싱
+    difficulties_summary = []
+    for assess_json in phase2_assess_history:
+        try:
+            assess_data = json.loads(assess_json)
+            justification = assess_data.get("justification", "")
+            selection = assess_data.get("selection", "")
+            formatted_selection = ", ".join(selection) if isinstance(selection, str) else selection
+            
+            if justification and selection:
+                difficulties_summary.append(f"- 선택 지표: {formatted_selection}\n  근거: {justification}")
+        except json.JSONDecodeError:
+            continue
+    
+    if not difficulties_summary:
+        return ""
+    
+    context = f"""
+# PHASE2 학습 맥락 정보
+학습자가 앞 단계(Phase2: 생각하기)에서 겪은 주요 어려움과 평가 기록:
+{chr(10).join(difficulties_summary)}
+
+이 정보를 참고하여, 학습자가 겪었던 어려움을 바탕으로 실험 단계에서 더 적절한 안내와 피드백을 제공하세요.
+"""
+    return context
+
 
 # 사이드바 시스템 체인 생성
-def generate_chain(model_name=INQUIRY_ASSISTANT_OPENAI_MODEL):
+def generate_chain(model_name=INQUIRY_ASSISTANT_OPENAI_MODEL, system_prompt=None):
+
+    if system_prompt is None:
+        full_system_prompt = PEER_AI_03EXPERIMENT_PROMPT
+    else:
+        full_system_prompt = system_prompt
+
     # 현재 선택된 operation 값 가져오기
     prompt = ChatPromptTemplate.from_messages([
-        ("system", PEER_AI_03EXPERIMENT_PROMPT),
+        ("system", full_system_prompt),
         MessagesPlaceholder(variable_name="history"),
         ("human", "{input}")
     ])
@@ -388,29 +474,66 @@ with st.sidebar:
     user_input = st.chat_input("궁금한 내용을 물어보세요!")
 
     # 만약에 사용자 입력이 들어오면...
-    if user_input and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", False)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", False)):
-        # 답변 요청
-        conv_chain = generate_chain(selected_model)
-        # 사용자의 입력
-        messages.chat_message("user").write(user_input)
+    if user_input: # and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", False)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", False)):
 
-        with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
-            # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
-            container = st.empty()
-            generator = conv_chain.stream(
-                {
-                    "input": user_input,
-                },
-                config={"configurable": {"session_id": "ab12"}}
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+
+            # 사용자의 입력
+            messages.chat_message("user").write(user_input)
+
+            if st.session_state["phase3_intermediary"] is None:
+                intermediary = Intermediary.Intermediary(
+                    client=OpenAI_Client(api_key=st.session_state.api_key),
+                    model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    phase=3,
+                    act_history=st.session_state.get("phase3_act_history", []),
+                    assessment_history=st.session_state.get("phase3_assess_history", [])
+                )
+                st.session_state["phase3_intermediary"] = intermediary
+            else:
+                intermediary = st.session_state["phase3_intermediary"]
+            
+            prompt, acts, assessment = intermediary.get_prompt(
+                conversation_history=st.session_state["tutor_messages"],
+                student_prompt=user_input
             )
-            ai_answer = ""
-            for token in generator:
-                ai_answer += token.content
-                container.markdown(ai_answer)
 
-        # 대화기록을 저장한다.
-        add_message("user", user_input)
-        add_message("assistant", ai_answer)
+            st.session_state["phase3_act_history"] = intermediary.get_act_history()
+            st.session_state["phase3_assess_history"] = intermediary.get_assess_history()
+
+            # 히스토리를 RunnableWithMessageHistory의 저장소에 동기화
+            # 현재 입력을 포함한 모든 이전 히스토리를 동기화
+            # (RunnableWithMessageHistory는 자동으로 새로운 AI 응답을 추가함)
+            sync_history_to_store(st.session_state["chain_session_id"], st.session_state["tutor_messages"])
+
+            # Phase2 학습 맥락 추가
+            phase2_context = get_phase2_learning_context()
+
+            print(phase2_context)
+            
+            # 시스템 프롬프트에 Phase2 맥락 추가
+            full_system_prompt = PEER_AI_03EXPERIMENT_PROMPT + phase2_context
+
+            # 답변 요청
+            conv_chain = generate_chain(selected_model, full_system_prompt)
+
+            with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
+                # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
+                container = st.empty()
+                generator = conv_chain.stream(
+                    {
+                        "input": prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input,
+                    },
+                    config={"configurable": {"session_id": st.session_state["chain_session_id"]}}
+                )
+                ai_answer = ""
+                for token in generator:
+                    ai_answer += token.content
+                    container.markdown(ai_answer)
+
+            # 대화기록을 저장한다.
+            add_message("user", user_input)
+            add_message("assistant", ai_answer)
 
 
 # Create columns with specific ratios

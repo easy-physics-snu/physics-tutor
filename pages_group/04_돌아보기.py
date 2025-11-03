@@ -3,6 +3,7 @@ import io
 import os
 import base64
 import asyncio
+import json
 
 from PIL import Image
 from datetime import datetime
@@ -10,10 +11,13 @@ from datetime import datetime
 
 from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
+from openai import OpenAI as OpenAI_Client
 
 from modules.multimodal import MultiModalwithHistory
 from modules.prompts import TUTOR_AI_04REFLECT_PROMPT
 from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
+
+import dms.Intermediary as Intermediary
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -60,6 +64,14 @@ if "show_answer" not in st.session_state:
 if "explanation_multimodal_chain_with_history" not in st.session_state:
     st.session_state["explanation_multimodal_chain_with_history"] = None
 
+if "phase4_intermediary" not in st.session_state:
+    st.session_state["phase4_intermediary"] = None
+
+if "phase4_act_history" not in st.session_state:
+    st.session_state["phase4_act_history"] = []
+
+if "phase4_assess_history" not in st.session_state:
+    st.session_state["phase4_assess_history"] = []
 
 def save_draw_image(numpy_array):
     """
@@ -103,23 +115,130 @@ def disalble_submit_button():
     st.session_state["submit_button_disabled"] = True
 
 
+def get_phase2_learning_context():
+    """Phase2에서 겪은 학습자의 어려움을 요약하여 context 문자열로 반환"""
+    phase2_assess_history = st.session_state.get("phase2_assess_history", [])
+    
+    if not phase2_assess_history:
+        return ""
+    
+    difficulties_summary = []
+    for assess_json in phase2_assess_history:
+        try:
+            assess_data = json.loads(assess_json)
+            justification = assess_data.get("justification", "")
+            selection = assess_data.get("selection", "")
+            formatted_selection = ", ".join(selection) if isinstance(selection, str) else selection
+            
+            if justification and selection:
+                difficulties_summary.append(f"- 선택 지표: {formatted_selection}\n  근거: {justification}")
+        except json.JSONDecodeError:
+            continue
+    
+    if not difficulties_summary:
+        return ""
+    
+    context = f"""
+# PHASE2 학습 맥락 정보
+학습자가 앞 단계(Phase2: 생각하기)에서 겪은 주요 어려움과 평가 기록:
+{chr(10).join(difficulties_summary)}
+
+이 정보를 참고하여, 학습자가 겪었던 어려움을 바탕으로 돌아보기 단계에서 더 적절한 안내와 피드백을 제공하세요.
+"""
+    return context
+
+def get_phase3_learning_context():
+    """Phase3에서 겪은 학습자의 어려움을 요약하여 context 문자열로 반환"""
+    phase3_assess_history = st.session_state.get("phase3_assess_history", [])
+    
+    if not phase3_assess_history:
+        return ""
+    
+    difficulties_summary = []
+    for assess_json in phase3_assess_history:
+        try:
+            assess_data = json.loads(assess_json)
+            justification = assess_data.get("justification", "")
+            selection = assess_data.get("selection", "")
+            formatted_selection = ", ".join(selection) if isinstance(selection, str) else selection
+            
+            if justification and selection:
+                difficulties_summary.append(f"- 선택 지표: {formatted_selection}\n  근거: {justification}")
+        except json.JSONDecodeError:
+            continue
+    
+    if not difficulties_summary:
+        return ""
+    
+    context = f"""
+# PHASE3 학습 맥락 정보
+학습자가 앞 단계(Phase3: 실험하기)에서 겪은 주요 어려움과 평가 기록:
+{chr(10).join(difficulties_summary)}
+
+이 정보를 참고하여, 학습자가 겪었던 어려움과 실험 결과를 바탕으로 돌아보기 단계에서 더 적절한 안내와 피드백을 제공하세요.
+"""
+    return context
+
+def get_learning_context():
+    """Phase2/Phase3 맥락을 합쳐서 반환"""
+    p2 = get_phase2_learning_context()
+    p3 = get_phase3_learning_context()
+    if not p2 and not p3:
+        return ""
+    parts = []
+    if p2:
+        parts.append(p2)
+    if p3:
+        parts.append(p3)
+    return "\n".join(parts)
+
 # 비동기 체인 생성
 async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
+    # 동적 시스템 프롬프트 구성 (앞 단계 학습 맥락 포함)
+    full_system_prompt = (system_prompt or "") + get_learning_context()
+
+    # 멀티모달 객체를 세션 상태에서 가져오거나 생성/갱신
+    chain_needs_init = (
+        st.session_state.get("explanation_multimodal_chain_with_history") is None
+        or st.session_state.get("explanation_system_prompt_signature") != full_system_prompt
+    )
+
     # 멀티모달 객체를 세션 상태에서 가져오거나 생성
-    if st.session_state["explanation_multimodal_chain_with_history"] is None:
+    if chain_needs_init:
         # 객체 생성
         llm = ChatOpenAI(
-            temperature=0.2,
+            temperature=0,
             model_name=model_name,
             openai_api_key = st.session_state.api_key
         )
 
-        # 멀티모달 객체 생성 및 세션에 저장
-        multimodal = MultiModalwithHistory(llm, system_prompt=system_prompt, user_prompt=user_prompt)
+        print(full_system_prompt)
+
+        # 핵심 수정: system_prompt에 full_system_prompt를 전달
+        multimodal = MultiModalwithHistory(llm, system_prompt=full_system_prompt, user_prompt=user_prompt)
         st.session_state["explanation_multimodal_chain_with_history"] = multimodal
+        st.session_state["explanation_system_prompt_signature"] = full_system_prompt
     else:
         # 기존 객체 재사용
+        print(full_system_prompt)
+
         multimodal = st.session_state["explanation_multimodal_chain_with_history"]
+
+    # # 멀티모달 객체를 세션 상태에서 가져오거나 생성
+    # if st.session_state["explanation_multimodal_chain_with_history"] is None:
+    #     # 객체 생성
+    #     llm = ChatOpenAI(
+    #         temperature=0.2,
+    #         model_name=model_name,
+    #         openai_api_key = st.session_state.api_key
+    #     )
+
+    #     # 멀티모달 객체 생성 및 세션에 저장
+    #     multimodal = MultiModalwithHistory(llm, system_prompt=system_prompt, user_prompt=user_prompt)
+    #     st.session_state["explanation_multimodal_chain_with_history"] = multimodal
+    # else:
+    #     # 기존 객체 재사용
+    #     multimodal = st.session_state["explanation_multimodal_chain_with_history"]
 
     # 이미지 파일로 부터 질의(스트림 방식)
     answer = multimodal.stream(user_prompt=user_prompt, image_url=image_filepath)
@@ -456,12 +575,35 @@ with st.sidebar:
     if st.session_state.get("explanation_submission_triggered", False) and "explanation_saved_image_path" in st.session_state:
         # 비동기 처리를 위한 상태 설정
         st.session_state["explanation_submission_in_progress"] = True
-        
+
         # 사용자의 입력
-        messages.chat_message("user").write(f"(제출한 답변): {st.session_state['explanation_user_reason']}")
+        user_submit_input = f"(제출한 답변): {st.session_state['explanation_user_reason']}"
+        messages.chat_message("user").write(user_submit_input)        
 
         # 비동기 처리를 위한 placeholder
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
+
+            # Intermediary 로직 추가 (Phase 4)
+            if st.session_state["phase4_intermediary"] is None:
+                intermediary = Intermediary.Intermediary(
+                    client=OpenAI_Client(api_key=st.session_state.api_key),
+                    model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    phase=4,
+                    act_history=st.session_state.get("phase4_act_history", []),
+                    assessment_history=st.session_state.get("phase4_assess_history", [])
+                )
+                st.session_state["phase4_intermediary"] = intermediary
+            else:
+                intermediary = st.session_state["phase4_intermediary"]
+
+            prompt, acts, assessment = intermediary.get_prompt(
+                conversation_history=st.session_state["messages_explanation"],
+                student_prompt=user_submit_input
+            )
+
+            st.session_state["phase4_act_history"] = intermediary.get_act_history()
+            st.session_state["phase4_assess_history"] = intermediary.get_assess_history()
+
             # 비동기 이벤트 루프 실행
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -475,7 +617,7 @@ with st.sidebar:
                 response = loop.run_until_complete(
                     handle_submission_async(
                         image_filepath,
-                        f"<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}", 
+                        f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}",
                         system_prompt,
                         selected_model
                     )
@@ -518,17 +660,47 @@ with st.sidebar:
     if user_input:
         # 비동기 처리
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
+
+            # 사용자의 입력
+            messages.chat_message("user").write(user_input)
+
+            # Intermediary 로직 (Phase 4)
+            if st.session_state["phase4_intermediary"] is None:
+                intermediary = Intermediary.Intermediary(
+                    client=OpenAI_Client(api_key=st.session_state.api_key),
+                    model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    phase=4,
+                    act_history=st.session_state.get("phase4_act_history", []),
+                    assessment_history=st.session_state.get("phase4_assess_history", [])
+                )
+                st.session_state["phase4_intermediary"] = intermediary
+            else:
+                intermediary = st.session_state["phase4_intermediary"]
+
+            prompt, acts, assessment = intermediary.get_prompt(
+                conversation_history=st.session_state["messages_explanation"],
+                student_prompt=user_input
+            )
+            # 히스토리 갱신
+            st.session_state["phase4_act_history"] = intermediary.get_act_history()
+            st.session_state["phase4_assess_history"] = intermediary.get_assess_history()
+
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
             try:
+                # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
+                image_filepath = process_png_to_bytesio(st.session_state["explanation_saved_image_path"])
+
                 # 답변 요청 (비동기)
                 response = loop.run_until_complete(
-                    generate_answer_async(None, system_prompt, user_input, selected_model)
+                    generate_answer_async(
+                        image_filepath,
+                        system_prompt,
+                        prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input,
+                        selected_model
+                    )
                 )
-
-                # 사용자의 입력
-                messages.chat_message("user").write(user_input)
 
                 with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                     # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
@@ -551,4 +723,3 @@ with st.sidebar:
                 st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
             finally:
                 loop.close()
-

@@ -185,11 +185,13 @@ with st.expander(
 **이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
 """)
     with main_tab1:
-        _, col2, _ = st.columns(3, vertical_alignment='center')
-        col2.image(
+        _, col1, col2, _ = st.columns([1, 3, 3, 1], vertical_alignment='center')
+        col1.image(
             image=MOON_IMAGE_PATH,
         )
-    
+        col2.image(
+            image=PROBLEM_IMAGE_PATH,
+        )
 
 # 사이드바 튜터 대화 턴(사용자 메시지 수) 확인 후 게이트
 user_turns = sum(1 for m in st.session_state.get("messages_predict", []) if getattr(m, "role", None) == "user")
@@ -484,7 +486,12 @@ with st.sidebar:
 
             try:
                 # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
-                image_filepath = process_png_to_bytesio(st.session_state["explanation_saved_image_path"])
+                image_source_path = (
+                    st.session_state.get("predict_saved_image_path")
+                    or CANVAS_IMAGE_PATH
+                )
+                # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
+                image_filepath = process_png_to_bytesio(image_source_path)
 
                 # 답변 요청 (비동기)
                 response = loop.run_until_complete(

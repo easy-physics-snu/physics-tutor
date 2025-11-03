@@ -690,7 +690,12 @@ with st.sidebar:
             
             try:
                 # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
-                image_filepath = process_png_to_bytesio(st.session_state["explanation_saved_image_path"])
+                image_source_path = (
+                    st.session_state.get("explanation_saved_image_path")
+                    or CANVAS_IMAGE_PATH
+                )
+                # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
+                image_filepath = process_png_to_bytesio(image_source_path)
 
                 # 답변 요청 (비동기)
                 response = loop.run_until_complete(

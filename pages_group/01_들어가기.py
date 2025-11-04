@@ -73,7 +73,28 @@ st.title("들어가기 🚀")
 st.subheader("오늘 배울 물리 개념은?")
 st.info("- 먼저 **[1. 여러 가지 운동]** 과 **[2. 힘과 운동]** 소단원에서 배운 내용을 복습해봅시다:) \n - 아래 2개 탭을 모두 마치고 다음 단계로 넘어가주세요!")
 
-st.image("src/images/find_tab_guide.png", width=500)
+# find_tab_guide.png 이미지 크기 조정 - 우선순위 높임
+st.markdown(
+    """
+    <style>
+    /* Streamlit 컨테이너를 타겟팅하는 더 구체적인 선택자 */
+    div[data-testid="stImage"] img[src*="find_tab_guide.png"],
+    div[data-testid="stImageContainer"] img[src*="find_tab_guide.png"],
+    img[src*="find_tab_guide.png"],
+    img[alt*="find_tab_guide"],
+    div img[src*="find_tab_guide.png"] {
+        width: 50% !important;
+        max-width: 50% !important;
+        height: auto !important;
+        max-height: none !important;
+        object-fit: contain !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.image("src/images/find_tab_guide.png", use_container_width=False)
 
 tab1, tab2 = st.tabs(["1. 여러 가지 운동", "2. 힘과 운동"])
 
@@ -86,89 +107,344 @@ if tab2:
 ########### TAB 1 ###########
 with tab1:
     st.write("**Q1. 놀이공원에서 볼 수 있는 여러 가지 놀이 기구들의 운동 방향과 속력 변화를 표에 정리해봅시다.**")
-    st.write("([운동 방향]과 [속력] 셀을 더블클릭한 후 알맞은 설명을 골라주세요)")
-    df = pd.DataFrame(
-        {
-            "Type" : ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
-            "Image": ["https://dimg.donga.com/ugc/CDB/SODA/Article/57/e0/f9/a4/57e0f9a4248cd2738de6.gif", "https://mblogthumb-phinf.pstatic.net/MjAyNDAxMTJfMjM3/MDAxNzA1MDQxNTI4NTI5.H9ncgGIDHPaCqa0i3Mz-2s8NU-qvEye8YQwlSQaFWZUg.wDDf8kJoDCbWyuVEBEqkzxfxQCv5GnNAMYw0Bo4nZnIg.GIF.onnamong/743084218.gif?type=w800", "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMDM2ZTRueWxqMW00emRyanIxaGVwdGx4amR2aW5scDNnYnMzbTg4YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WqSCrUOEWQpWC8JGNg/giphy.webp", "https://mblogthumb-phinf.pstatic.net/MjAyMjEyMjhfMTMx/MDAxNjcyMTYzMDc2Mzc3.RACWbUSQ5ys66npAKl1ABuFkloP9bs3D3Hg6Hv0rhG0g.z4ZBQI_SRDXNCaO8v51EZrYxIkCwLcnawqYXJjqunrsg.GIF.mok5022/3546279707.gif?type=w800"],
-            "Direction": [None, None, None, None],
-            "Speed": [None, None, None, None]
+    st.write("([운동 방향]과 [속력] 셀을 클릭하여 알맞은 설명을 골라주세요)")
+    
+    # 원본 순서 정의 (고정 순서)
+    original_types = ["자이로드롭", "회전목마", "롤러코스터", "바이킹"]
+    images = [
+        "https://dimg.donga.com/ugc/CDB/SODA/Article/57/e0/f9/a4/57e0f9a4248cd2738de6.gif",
+        "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExc2w5eWNla2NmbWR0ZnYzdHRjMDRpZnVlNGV4dWJlZGJudWE4dDBvcyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/wJQF23Gt0eEMS2Zcbb/giphy.gif",
+        "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMDM2ZTRueWxqMW00emRyanIxaGVwdGx4amR2aW5scDNnYnMzbTg4YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WqSCrUOEWQpWC8JGNg/giphy.webp",
+        "https://mblogthumb-phinf.pstatic.net/MjAyMjEyMjhfMTMx/MDAxNjcyMTYzMDc2Mzc3.RACWbUSQ5ys66npAKl1ABuFkloP9bs3D3Hg6Hv0rhG0g.z4ZBQI_SRDXNCaO8v51EZrYxIkCwLcnawqYXJjqunrsg.GIF.mok5022/3546279707.gif?type=w800"
+    ]
+    
+    # 세션 상태 초기화 (각 행의 선택값 저장)
+    if "q1_direction" not in st.session_state:
+        st.session_state.q1_direction = {ride: None for ride in original_types}
+    if "q1_speed" not in st.session_state:
+        st.session_state.q1_speed = {ride: None for ride in original_types}
+    
+    # 표 스타일링 (행 높이 줄이기 - Q1 질문부터 한 화면에 보이도록 더 축소)
+    st.markdown(
+        """
+        <style>
+        /* Q1 질문 텍스트 간격 축소 */
+        div[data-testid="stMarkdownContainer"] p:first-of-type {
+            margin-bottom: 0.3rem !important;
         }
+        
+        /* Q1 표 영역 전체 더 축소 */
+        div[data-testid="column"] {
+            padding-bottom: 0.05rem !important;
+            padding-top: 0.05rem !important;
+        }
+        
+        /* selectbox 높이 더 축소 */
+        .stSelectbox > div > div {
+            padding-top: 0.1rem !important;
+            padding-bottom: 0.1rem !important;
+            font-size: 0.8rem !important;
+            min-height: 1.5rem !important;
+        }
+        
+        /* multiselect 높이 더 축소 */
+        .stMultiSelect > div > div {
+            padding-top: 0.1rem !important;
+            padding-bottom: 0.1rem !important;
+            font-size: 0.8rem !important;
+            min-height: 1.5rem !important;
+        }
+        
+        /* 표 내부 이미지 컨테이너 크기 고정 (0.3rem × 0.2rem) */
+        div[data-testid="column"] .stImage {
+            width: 0.2rem !important;
+            height: 0.1rem !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        /* 표 내부 이미지가 컨테이너를 채우도록 설정 */
+        div[data-testid="column"] .stImage img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        
+        /* 바이킹 이미지 특별 설정 - 하단 0.5cm 잘림 */
+        div[data-testid="column"] .stImage img[src*="3546279707"] {
+            object-position: 50% top !important;  /* 상단 중앙을 기준으로 하단 0.5cm가 잘림 */
+        }
+        
+        /* 표 텍스트 크기 더 축소 */
+        div[data-testid="column"] p,
+        div[data-testid="column"] .stMarkdown {
+            font-size: 0.8rem !important;
+            margin-bottom: 0.05rem !important;
+            margin-top: 0.05rem !important;
+            line-height: 1.2 !important;
+        }
+        
+        /* 헤더 텍스트 크기 조정 */
+        div[data-testid="column"] strong {
+            font-size: 0.85rem !important;
+        }
+        
+        /* 구분선(hr) 마진 축소 */
+        hr {
+            margin-top: 0.3rem !important;
+            margin-bottom: 0.3rem !important;
+        }
+        
+        /* 표 행 높이 통일 - 헤더 행 높이 기준 */
+        div[data-testid="stHorizontalBlock"]:has(strong) {
+            height: 1.5rem !important;  /* 헤더 행 높이 */
+            overflow: hidden !important;
+        }
+        
+        /* 데이터 행 높이 (모두 동일, 내용이 많으면 잘림) */
+        div[data-testid="stHorizontalBlock"]:not(:has(strong)) {
+            height: 8rem !important;  /* 헤더 행과 동일한 높이 */
+            align-items: stretch !important;
+            overflow: hidden !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
     )
-
-    column_configuration = {
-        "Type": st.column_config.TextColumn("놀이 기구", disabled=True),
-        "Image": st.column_config.ImageColumn("이미지 (더블클릭해서 확대해보세요)"),
-        "Direction": st.column_config.SelectboxColumn(
-            "운동 방향", options=["변한다", "일정하다"]
-        ),
-        "Speed": st.column_config.SelectboxColumn(
-            "속력", options=["변한다", "일정하다"]
-        ),
-    }
-
-    edited_df = st.data_editor(
-        data=df,
-        column_config=column_configuration,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        )
-
+    
+    # 헤더 행
+    header_cols = st.columns(4)
+    with header_cols[0]:
+        st.markdown("**놀이 기구**")
+    with header_cols[1]:
+        st.markdown("**이미지**")
+    with header_cols[2]:
+        st.markdown("**운동 방향**")
+    with header_cols[3]:
+        st.markdown("**속력**")
+    
+    st.markdown("---")
+    
+    # 데이터 행 (4개)
+    for idx, ride_type in enumerate(original_types):
+        row_cols = st.columns(4)
+        
+        with row_cols[0]:
+            st.write(ride_type)
+        
+        with row_cols[1]:
+            st.image(images[idx], use_container_width=True)
+        
+        with row_cols[2]:
+            direction_options = ["변한다", "일정하다"]
+            current_direction = st.session_state.q1_direction[ride_type]
+            
+            # 현재 선택값을 리스트로 변환 (multiselect용)
+            default_direction = [current_direction] if current_direction else []
+            
+            selected_direction_list = st.multiselect(
+                f"{ride_type} 운동 방향",
+                options=direction_options,
+                default=default_direction,
+                key=f"direction_{idx}",
+                label_visibility="collapsed"
+            )
+            
+            # 하나만 선택 가능하도록 - 리스트의 첫 번째 요소만 사용
+            if len(selected_direction_list) > 1:
+                # 여러 개 선택된 경우 마지막 선택만 유지
+                selected_direction = selected_direction_list[-1]
+            elif len(selected_direction_list) == 1:
+                selected_direction = selected_direction_list[0]
+            else:
+                selected_direction = None
+            
+            # 선택값 저장
+            st.session_state.q1_direction[ride_type] = selected_direction
+        
+        with row_cols[3]:
+            speed_options = ["변한다", "일정하다"]
+            current_speed = st.session_state.q1_speed[ride_type]
+            
+            # 현재 선택값을 리스트로 변환 (multiselect용)
+            default_speed = [current_speed] if current_speed else []
+            
+            selected_speed_list = st.multiselect(
+                f"{ride_type} 속력",
+                options=speed_options,
+                default=default_speed,
+                key=f"speed_{idx}",
+                label_visibility="collapsed"
+            )
+            
+            # 하나만 선택 가능하도록 - 리스트의 첫 번째 요소만 사용
+            if len(selected_speed_list) > 1:
+                # 여러 개 선택된 경우 마지막 선택만 유지
+                selected_speed = selected_speed_list[-1]
+            elif len(selected_speed_list) == 1:
+                selected_speed = selected_speed_list[0]
+            else:
+                selected_speed = None
+            
+            # 선택값 저장
+            st.session_state.q1_speed[ride_type] = selected_speed
+        
+        # 행 간격 줄이기 (구분선 제거)
+    
+    # 정답 체크
     st.session_state.q1 = False
     info_q1 = st.empty()
-    if edited_df.notnull().all().all():
-        if edited_df.iloc[0, 2] == "일정하다":
-            if edited_df.iloc[0, 3] == "변한다":         
-                if edited_df.iloc[1, 2] == "변한다":
-                    if edited_df.iloc[1, 3] == "일정하다":
-                        if edited_df.iloc[2, 2] == "변한다":
-                            if edited_df.iloc[2, 3] == "변한다":
-                                if edited_df.iloc[3, 2] == "변한다":
-                                    if edited_df.iloc[3, 3] == "변한다":
+    
+    # 모든 드롭다운이 선택되었는지 확인 (None이 아니면 선택됨)
+    all_selected = all(
+        st.session_state.q1_direction[ride] is not None and 
+        st.session_state.q1_speed[ride] is not None 
+        for ride in original_types
+    )
+    
+    # 모든 드롭다운이 선택되었을 때만 정답 체크
+    if all_selected:
+        # 정답 체크 로직
+        correct_answers = {
+            "자이로드롭": {"direction": "일정하다", "speed": "변한다"},
+            "회전목마": {"direction": "변한다", "speed": "일정하다"},
+            "롤러코스터": {"direction": "변한다", "speed": "변한다"},
+            "바이킹": {"direction": "변한다", "speed": "변한다"}
+        }
+        
+        is_correct = True
+        
+        # 틀린 항목을 놀이기구별로 분류
+        wrong_by_ride = {}
+        
+        for ride in original_types:
+            student_dir = st.session_state.q1_direction[ride]
+            student_speed = st.session_state.q1_speed[ride]
+            correct_dir = correct_answers[ride]["direction"]
+            correct_speed = correct_answers[ride]["speed"]
+            
+            wrong_parts = []
+            if student_dir != correct_dir:
+                wrong_parts.append("운동 방향")
+            if student_speed != correct_speed:
+                wrong_parts.append("속력")
+            
+            if wrong_parts:
+                is_correct = False
+                wrong_by_ride[ride] = wrong_parts
+        
+        if is_correct:
                                         st.session_state.q1 = True
                                         info_q1.success("정답입니다!")
                                         if not st.session_state.balloons_t1_q1:
                                             st.balloons()
                                             st.session_state.balloons_t1_q1 = True
+        else:
+            if st.session_state.q1:
+                info_q1.success("정답입니다!")
+            else:
+                # 틀린 항목을 그룹화하여 메시지 생성
+                direction_rides = []
+                speed_rides = []
+                
+                for ride, wrong_parts in wrong_by_ride.items():
+                    if "운동 방향" in wrong_parts:
+                        direction_rides.append(ride)
+                    if "속력" in wrong_parts:
+                        speed_rides.append(ride)
+                
+                error_parts = []
+                if direction_rides:
+                    error_parts.append(f"{', '.join(direction_rides)}의 운동 방향")
+                if speed_rides:
+                    error_parts.append(f"{', '.join(speed_rides)}의 속력")
+                
+                if error_parts:
+                    error_msg = ", ".join(error_parts) + "을 다시 살펴보세요🔍"
+                    info_q1.error(error_msg)
+    else:
+        # 일부만 선택된 경우 이전 정답 상태 유지
         if st.session_state.q1:
             info_q1.success("정답입니다!")
-        else:
-            info_q1.error("틀렸습니다. 다시 시도하세요.")
 
     st.write("")
     st.write("") 
 
     st.write("**Q2. 놀이 기구의 운동을 다음과 같이 분류해 봅시다.**")
-    st.write("(각 놀이 기구는 중복없이 한가지에만 포함됩니다)")
     options_1 = st.multiselect(
         "속력만 변하는 운동",
-        ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
+        ["자이로드롭", "회전목마", "롤러코스터", "바이킹"],
     )
     options_2 = st.multiselect(
         "운동 방향만 변하는 운동",
-        ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
+        ["자이로드롭", "회전목마", "롤러코스터", "바이킹"],
     )
     options_3 = st.multiselect(
         "속력과 운동 방향이 모두 변하는 운동",
-        ["자이로드롭", "대관람차", "롤러코스터", "바이킹"],
+        ["자이로드롭", "회전목마", "롤러코스터", "바이킹"],
     )
 
     st.session_state.q2 = False
     info_q2 = st.empty()
+    
+    correct_q2 = {
+        "속력만 변하는 운동": ["자이로드롭"],
+        "운동 방향만 변하는 운동": ["회전목마"],
+        "속력과 운동 방향이 모두 변하는 운동": ["롤러코스터", "바이킹"]
+    }
+    
     if options_1 and options_2 and options_3:
-        if options_1 == ["자이로드롭"]:
-            if options_2 == ["대관람차"]:
-                if options_3 == ["롤러코스터", "바이킹"] or options_3 == ["바이킹", "롤러코스터"]:
+        is_correct = True
+        wrong_categories = []
+        
+        # 속력만 변하는 운동 체크
+        if sorted(options_1) != sorted(correct_q2["속력만 변하는 운동"]):
+            is_correct = False
+            wrong_categories.append(f"**속력만 변하는 운동**: {options_1 if options_1 else '선택 없음'} (정답: {correct_q2['속력만 변하는 운동']})")
+        
+        # 운동 방향만 변하는 운동 체크
+        if sorted(options_2) != sorted(correct_q2["운동 방향만 변하는 운동"]):
+            is_correct = False
+            wrong_categories.append(f"**운동 방향만 변하는 운동**: {options_2 if options_2 else '선택 없음'} (정답: {correct_q2['운동 방향만 변하는 운동']})")
+        
+        # 속력과 운동 방향이 모두 변하는 운동 체크
+        if sorted(options_3) != sorted(correct_q2["속력과 운동 방향이 모두 변하는 운동"]):
+            is_correct = False
+            wrong_categories.append(f"**속력과 운동 방향이 모두 변하는 운동**: {options_3 if options_3 else '선택 없음'} (정답: {correct_q2['속력과 운동 방향이 모두 변하는 운동']})")
+        
+        if is_correct:
                     st.session_state.q2 = True
                     info_q2.success("정답입니다!")
                     if not st.session_state.balloons_t1_q2:
                         st.balloons()
                         st.session_state.balloons_t1_q2 = True
-        if st.session_state.q2:
-            info_q2.success("정답입니다!")
         else:
-            info_q2.error("틀렸습니다. 다시 시도하세요.")
+            if st.session_state.q2:
+                info_q2.success("정답입니다!")
+            else:
+                error_msg = "다음 분류를 확인해주세요:\n\n"
+                for category in wrong_categories:
+                    error_msg += f"- {category}\n"
+                info_q2.error(error_msg)
+    else:
+        # 모든 항목이 선택되지 않은 경우
+        missing = []
+        if not options_1:
+            missing.append("속력만 변하는 운동")
+        if not options_2:
+            missing.append("운동 방향만 변하는 운동")
+        if not options_3:
+            missing.append("속력과 운동 방향이 모두 변하는 운동")
+        if missing:
+            info_q2.warning(f"다음 항목을 선택해주세요: {', '.join(missing)}")
+        elif st.session_state.q2:
+            info_q2.success("정답입니다!")
 
     if st.session_state.q1 and st.session_state.q2:
         st.subheader("**핵심 정리!**")
@@ -181,7 +457,7 @@ with tab1:
 ########### TAB 2 ###########
 with tab2:
     # AI 튜터의 프롬프트 설정
-    TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.
+    TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.  
 
     다음 지침을 따라주세요:
     
@@ -330,7 +606,7 @@ with tab2:
 다음 형식으로만 답변해주세요:
 판정: [정답/오답]
 피드백: [세 문장 이내로 작성]"""
-
+            
             response = client.chat.completions.create(
                 model=TUTOR_OPENAI_MODEL,
                 messages=[
@@ -394,7 +670,7 @@ with tab2:
         # AI 응답 생성 중 상태 표시
         with status_container:
             st.info("🤔 AI가 답변을 생성중입니다...")
-            
+        
         # LLM을 사용한 답변 평가 (정오답 판정 + 피드백을 한 번에 받음)
         is_correct, ai_feedback = evaluate_answer_with_llm(user_input, st.session_state.current_question)
         

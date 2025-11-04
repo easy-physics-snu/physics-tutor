@@ -1,7 +1,11 @@
 import os
 import asyncio
 import streamlit as st
+import uuid
+import json
+
 from PIL import Image
+from enum import Enum
 from datetime import datetime
 
 # from streamlit_drawable_canvas import st_canvas
@@ -13,6 +17,7 @@ from modules.multimodal import MultiModalwithHistory
 # from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 from modules.prompts import PEER_AI_02THINK_PROMPT
+from modules.dynamo import initialize_session
 
 import dms.Intermediary as Intermediary
 
@@ -50,12 +55,6 @@ if not os.path.exists(".cache/files"):
 if not os.path.exists(".cache/embeddings"):
     os.mkdir(".cache/embeddings")
 
-st.set_page_config(layout="wide")
-
-st.title("생각하기 🤔")
-st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.")
-
-
 # 처음 1번만 실행하기 위한 코드
 if "messages_predict" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
@@ -88,8 +87,12 @@ if "phase2_act_history" not in st.session_state:
 if "phase2_assess_history" not in st.session_state:
     st.session_state["phase2_assess_history"] = []
 
+# 대화 턴 추적을 위한 변수 추가
+if "phase2_current_turn" not in st.session_state:
+    st.session_state["phase2_current_turn"] = 0
+
 # 비동기 체인 생성
-async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):
+async def generate_answer_async(image_filepath, system_prompt, user_prompt, model_name="gpt-4.1"):    
     # 멀티모달 객체를 세션 상태에서 가져오거나 생성
     if st.session_state["multimodal_chain_with_history"] is None:
         # 객체 생성
@@ -174,6 +177,48 @@ async def handle_submission_async(image_url, reason_text, system_prompt, selecte
         st.error(f"제출 처리 중 오류가 발생했습니다: {str(e)}")
         return None
 
+
+def save_message_to_db(role: str, content: str, content_type: str = "text", llm_model: str = None, turn: int = None):
+    """
+    메시지를 DynamoDB에 저장
+    """
+    if not st.session_state.get("phase2_manager"):
+        return False
+    
+    if not st.session_state.get("session_uuid"):
+        return False
+    
+    # turn이 제공되지 않으면 현재 턴 사용
+    if turn is None:
+        turn = st.session_state.get("phase2_current_turn", 0)
+    
+    try:
+        success = st.session_state["phase2_manager"].save_phase_message(
+            session_id=st.session_state["session_uuid"],
+            role=role,
+            content_type=content_type,
+            content=content,
+            llm_model=llm_model,
+            turn=turn
+        )
+        return success
+    except Exception as e:
+        print(f"메시지 저장 실패: {e}")
+        return False
+
+#--------------------------------#
+#            DynamoDB 설정        #
+#--------------------------------#
+# Phase 2 페이지 초기화
+initialize_session(phase_num=2)
+
+#--------------------------------#
+#             메인 UI             #
+#--------------------------------#
+st.set_page_config(layout="wide")
+
+st.title("생각하기 🤔")
+st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.")
 
 with st.expander(
     label="문제 보기 🔍",
@@ -262,6 +307,41 @@ if st.session_state.get("show_predict_input", False):
         st.session_state["predict_user_reason"] = reason
         st.session_state["predict_saved_image_path"] = saved_image_path
         st.session_state["submission_triggered"] = True  # 제출이 트리거되었음을 표시
+
+        # 새로운 턴 시작 (사용자 답안 제출)
+        st.session_state["phase2_current_turn"] += 1
+        current_turn = st.session_state["phase2_current_turn"]
+
+        # S3에 업로드 (저장된 파일을 직접 사용)
+        if saved_image_path and st.session_state.get("s3_manager") and st.session_state.get("session_uuid"):
+            try:
+                s3_path = st.session_state["s3_manager"].upload_image_file_to_s3(
+                    file_path=saved_image_path,
+                    session_id=st.session_state["session_uuid"]
+                )
+                
+                if s3_path:
+                    print(f"S3 업로드 완료: {s3_path}")
+                    st.session_state["predict_saved_image_s3_path"] = s3_path
+                else:
+                    print("S3 업로드 실패")
+            except Exception as e:
+                print(f"S3 업로드 중 오류: {e}")
+                # S3 업로드 실패해도 로컬 저장은 유지
+
+        # 제출된 답변을 DB에 저장 (이미지 경로 포함)
+        submission_content = f"[제출한 답변 (이유)]: {reason}" + "\n"
+        if saved_image_path:
+            if st.session_state.get("predict_saved_image_s3_path"):
+                submission_content += f"[캔버스 이미지 S3 경로]: {st.session_state['predict_saved_image_s3_path']}"
+        
+        save_message_to_db(
+            role="user",
+            content=submission_content,
+            content_type="submission",  # 제출 타입으로 표시
+            turn=current_turn
+        )
+
         st.success("좌측 사이드바의 **🤓AI 친구**의 피드백을 확인해주세요!")
         st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)")
 
@@ -327,7 +407,7 @@ with st.sidebar:
             else:
                 messages.chat_message(chat_message.role).write(chat_message.content)
 
-    # 새로운 메시지를 추가
+    # 새로운 메시지를 추가 (DB 저장은 각 호출 지점에서 명시적으로 처리)
     def add_message(role, message):
         st.session_state["messages_predict"].append(ChatMessage(role=role, content=message))
 
@@ -348,6 +428,9 @@ with st.sidebar:
         # 비동기 처리를 위한 상태 설정
         st.session_state["submission_in_progress"] = True
         
+        # 새로운 턴 시작 (사용자 질문)        
+        current_turn = st.session_state["phase2_current_turn"]
+
         # 사용자의 입력
         user_submit_input = f"(제출한 답변): {st.session_state['predict_user_reason']}"
         messages.chat_message("user").write(user_submit_input)
@@ -376,6 +459,46 @@ with st.sidebar:
             st.session_state["phase2_act_history"] = intermediary.get_act_history()
             st.session_state["phase2_assess_history"] = intermediary.get_assess_history()
 
+            # 시스템 프롬프트 저장 (turn 포함)
+            save_message_to_db(
+                role="system",
+                content=system_prompt,
+                content_type="system_prompt",
+                turn=current_turn
+            )
+
+            # assessment와 acts도 저장 (turn 포함)
+            if assessment:
+                # assessment가 이미 JSON 문자열이므로, 파싱 후 다시 직렬화하여 한글 유지
+                try:
+                    if isinstance(assessment, str):
+                        assessment_dict = json.loads(assessment)
+                    else:
+                        assessment_dict = assessment
+                    assessment_formatted = json.dumps(assessment_dict, ensure_ascii=False, indent=2)
+                except (json.JSONDecodeError, TypeError):
+                    # 파싱 실패 시 그대로 저장
+                    assessment_formatted = str(assessment)
+                
+                save_message_to_db(
+                    role="assistant",
+                    content=f"[Intermediary Assessment]\n{assessment_formatted}",
+                    content_type="intermediary_assessment",
+                    llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    turn=current_turn
+                )
+
+            if acts:
+                # Enum 객체를 문자열로 변환하여 JSON 직렬화 가능하게 만듦
+                acts_serializable = [act.name if isinstance(act, Enum) else str(act) for act in acts]
+                save_message_to_db(
+                    role="assistant",
+                    content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
+                    content_type="intermediary_acts",
+                    llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    turn=current_turn
+                )
+
             # 비동기 이벤트 루프 실행
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -383,13 +506,24 @@ with st.sidebar:
             try:
                 # 이미지 파일을 bytesio로 변환후 path 반환 처리
                 image_filepath = process_png_to_bytesio(st.session_state["predict_saved_image_path"])
-                
+
+                # LLM에 전달될 사용자 프롬프트 생성
+                user_prompt_for_llm = f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}"
+
+                # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
+                save_message_to_db(
+                    role="system",
+                    content=f"[LLM에 전달된 사용자 프롬프트]\n{user_prompt_for_llm}",
+                    content_type="llm_user_prompt",
+                    turn=current_turn
+                )
+
                 # AI 답변과 함께 제출 처리
                 # 비동기 요청
                 response = loop.run_until_complete(
                     handle_submission_async(
                         image_filepath,
-                        f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}", 
+                        user_prompt_for_llm,
                         system_prompt,
                         selected_model
                     )
@@ -410,6 +544,21 @@ with st.sidebar:
                     # 대화 기록에 추가
                     add_message("user", f"(제출한 답변): {st.session_state['predict_user_reason']}")
                     add_message("assistant", ai_feedback)
+
+                    # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+                    save_message_to_db(
+                        role="user",
+                        content=user_submit_input,
+                        content_type="submission",
+                        turn=current_turn
+                    )
+                    save_message_to_db(
+                        role="assistant",
+                        content=ai_feedback,
+                        content_type="feedback",
+                        llm_model=selected_model,
+                        turn=current_turn
+                    )
                 else:
                     st.error("AI 답변 생성에 실패했습니다.")
 
@@ -444,6 +593,10 @@ with st.sidebar:
     if user_input: # and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", True)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", True)):
         # 비동기 처리
         
+        # 새로운 턴 시작 (사용자 질문)
+        st.session_state["phase2_current_turn"] += 1
+        current_turn = st.session_state["phase2_current_turn"]
+        
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             # 사용자의 입력
@@ -469,6 +622,46 @@ with st.sidebar:
             st.session_state["phase2_act_history"] = intermediary.get_act_history()
             st.session_state["phase2_assess_history"] = intermediary.get_assess_history()
 
+            # 시스템 프롬프트 저장 (turn 포함)
+            save_message_to_db(
+                role="system",
+                content=system_prompt,
+                content_type="system_prompt",
+                turn=current_turn
+            )
+
+            # assessment와 acts도 저장 (turn 포함)
+            if assessment:
+                # assessment가 이미 JSON 문자열이므로, 파싱 후 다시 직렬화하여 한글 유지
+                try:
+                    if isinstance(assessment, str):
+                        assessment_dict = json.loads(assessment)
+                    else:
+                        assessment_dict = assessment
+                    assessment_formatted = json.dumps(assessment_dict, ensure_ascii=False, indent=2)
+                except (json.JSONDecodeError, TypeError):
+                    # 파싱 실패 시 그대로 저장
+                    assessment_formatted = str(assessment)
+                
+                save_message_to_db(
+                    role="assistant",
+                    content=f"[Intermediary Assessment]\n{assessment_formatted}",
+                    content_type="intermediary_assessment",
+                    llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    turn=current_turn
+                )
+
+            if acts:
+                # Enum 객체를 문자열로 변환하여 JSON 직렬화 가능하게 만듦
+                acts_serializable = [act.name if isinstance(act, Enum) else str(act) for act in acts]
+                save_message_to_db(
+                    role="assistant",
+                    content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
+                    content_type="intermediary_acts",
+                    llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    turn=current_turn
+                )
+
             # print(f"prompt: {prompt}")
             # print(f"acts: {acts}")
             # print(f"assessment: {assessment}")
@@ -493,12 +686,23 @@ with st.sidebar:
                 # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
                 image_filepath = process_png_to_bytesio(image_source_path)
 
+                # LLM에 전달될 사용자 프롬프트 생성
+                user_prompt_for_llm = prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input
+                
+                # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
+                save_message_to_db(
+                    role="system",
+                    content=f"[LLM에 전달된 사용자 프롬프트]\n{user_prompt_for_llm}",
+                    content_type="llm_user_prompt",
+                    turn=current_turn
+                )
+
                 # 답변 요청 (비동기)
                 response = loop.run_until_complete(
                     generate_answer_async(
                         image_filepath,
                         system_prompt,
-                        prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input,
+                        user_prompt_for_llm,
                         selected_model
                     )
                 )
@@ -517,6 +721,21 @@ with st.sidebar:
                     # 대화기록을 저장한다.
                     add_message("user", user_input)
                     add_message("assistant", ai_answer)
+                    
+                    # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+                    save_message_to_db(
+                        role="user",
+                        content=user_input,
+                        content_type="text",
+                        turn=current_turn
+                    )
+                    save_message_to_db(
+                        role="assistant",
+                        content=ai_answer,
+                        content_type="text",
+                        llm_model=selected_model,
+                        turn=current_turn
+                    )
                 else:
                     st.error("AI 답변 생성에 실패했습니다.")
 

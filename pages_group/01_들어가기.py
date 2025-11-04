@@ -15,7 +15,8 @@ st.session_state.api_key = st.secrets["openai_api_key"]
 
 # TEXTBOOK_FILE_PATH = "src/textbooks/physics_textbook.pdf" #제거할 예정
 
-TUTOR_OPENAI_MODEL = "gpt-4.1-mini"
+##TODO 민선쌤 성능 이슈로 gpt-4.1 모델로 바꿨어요~
+TUTOR_OPENAI_MODEL = "gpt-4.1"
 # RAG_OPENAI_MODEL = "gpt-4o"
 # RAG_SYSTEM_PROMPT = "prompts/doc-rag-scaffold.yaml"
 

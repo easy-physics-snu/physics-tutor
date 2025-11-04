@@ -623,13 +623,14 @@ def process_answer(user_input):
     if score >= 80:
         # 정답! 완료 메시지
         stars = "⭐⭐⭐⭐⭐"
-        completion_msg = f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
+        completion_msg = f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. "
         
         # missing_contents가 실제로 있는 경우만 표시
         missing_clean = missing.strip().strip("[]").strip()
         if missing_clean and missing_clean.lower() not in ["없음", "none", ""]:
-            completion_msg += f"\n\n지금 답변에서 [{missing_clean}] 도 고려하면 더 완벽한 답변이 될 거예요."
+            completion_msg += f"지금 답변에 [{missing_clean}] 도 포함시키면 더 완벽한 답변이 될 거예요."
         
+        completion_msg+= f"\n\n모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
         completion_msg += "\n\n**메인 화면의 답변 작성란에 최종 답안을 다시 작성해보세요!**"
         
         add_message_to_history("assistant", completion_msg)
@@ -749,9 +750,12 @@ if st.session_state.get("show_resources", False):
 #####################################
 with st.sidebar:
     st.write("**AI 선생님**의 피드백")
+    
     messages = st.container(height=400)
+    st.write("답안은 완전한 문장 형태로 작성해주세요:)")
     status_container = st.empty()
     ai_info = st.empty()
+    
 
     # 초기 메시지 추가 (한 번만)
     if len(st.session_state.chat_history_applying) == 0:

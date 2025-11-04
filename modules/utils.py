@@ -133,20 +133,20 @@ def load_and_optimize_canvas_image(image_path, target_size=(500, 500)):
         
         # 이미지가 이미 최적화된 크기인지 확인
         if img.size != target_size:
-            print(f"이미지 크기 조정: {img.size} -> {target_size}")
+            # print(f"이미지 크기 조정: {img.size} -> {target_size}")
             img = img.resize(target_size, Image.Resampling.LANCZOS)
         
         # 메모리 최적화를 위해 이미지 복사
         optimized_img = img.copy()
         
-        print(f"캔버스 이미지 로드 성공: {image_path} (크기: {optimized_img.size})")
+        # print(f"캔버스 이미지 로드 성공: {image_path} (크기: {optimized_img.size})")
         return optimized_img
         
     except Exception as e:
-        print(f"이미지 로드 실패, 기본 이미지 생성: {str(e)}")
+        # print(f"이미지 로드 실패, 기본 이미지 생성: {str(e)}")
         # 실패 시 기본 이미지 생성 (반드시 반환)
         fallback_img = Image.new('RGBA', target_size, (238, 238, 238, 255))  # #EEEEEE
-        print(f"기본 이미지 생성: {target_size}")
+        # print(f"기본 이미지 생성: {target_size}")
         return fallback_img
 
 
@@ -233,7 +233,7 @@ def load_image_in_thread(image_path, target_size=(500, 500)):
         return img
         
     except Exception as e:
-        print(f"이미지 로드 실패, 기본 이미지 생성: {str(e)}")
+        # print(f"이미지 로드 실패, 기본 이미지 생성: {str(e)}")
         # 기본 이미지 생성
         return Image.new('RGBA', target_size, (238, 238, 238, 255))
 
@@ -267,9 +267,9 @@ def create_async_canvas_with_guaranteed_image(canvas_image_path, **canvas_kwargs
     # 스레드 풀을 사용하여 이미지 로딩 (캐싱됨)
     try:
         background_image = get_cached_image_with_thread(canvas_image_path, target_size)
-        print(f"캔버스 이미지 로드 성공: {canvas_image_path}")
+        # print(f"캔버스 이미지 로드 성공: {canvas_image_path}")
     except Exception as e:
-        print(f"이미지 로드 실패, 기본 이미지 사용: {str(e)}")
+        #print(f"이미지 로드 실패, 기본 이미지 사용: {str(e)}")
         background_image = Image.new('RGBA', target_size, (238, 238, 238, 255))
     
     # 기본 캔버스 설정
@@ -291,7 +291,7 @@ def create_async_canvas_with_guaranteed_image(canvas_image_path, **canvas_kwargs
     # 반드시 background_image 설정
     default_kwargs["background_image"] = background_image
     
-    print(f"캔버스 생성 완료: {canvas_image_path}")
+    # print(f"캔버스 생성 완료: {canvas_image_path}")
     return st_canvas(**default_kwargs)
 
 
@@ -303,10 +303,10 @@ def preload_canvas_image(image_path, target_size=(500, 500)):
     try:
         # 이미지를 미리 로딩하여 캐시에 저장
         get_cached_image_with_thread(image_path, target_size)
-        print(f"캔버스 이미지 프리로딩 완료: {image_path}")
+        # print(f"캔버스 이미지 프리로딩 완료: {image_path}")
         return True
     except Exception as e:
-        print(f"캔버스 이미지 프리로딩 실패: {str(e)}")
+        #print(f"캔버스 이미지 프리로딩 실패: {str(e)}")
         return False
 
 
@@ -329,7 +329,7 @@ def ensure_canvas_image_loaded(image_path, target_size=(500, 500)):
         return success
         
     except Exception as e:
-        print(f"캔버스 이미지 로딩 확인 실패: {str(e)}")
+        # print(f"캔버스 이미지 로딩 확인 실패: {str(e)}")
         return False
 
 

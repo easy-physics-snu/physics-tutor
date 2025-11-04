@@ -17,7 +17,7 @@ from modules.multimodal import MultiModalwithHistory
 # from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
 from modules.prompts import PEER_AI_02THINK_PROMPT
-from modules.dynamo import DynamoDBManager, S3Manager, SessionManager, PhaseManager
+from modules.dynamo import initialize_session
 
 import dms.Intermediary as Intermediary
 
@@ -209,70 +209,8 @@ def save_message_to_db(role: str, content: str, content_type: str = "text", llm_
 #--------------------------------#
 #            DynamoDB 설정        #
 #--------------------------------#
-# AWS 설정 (secrets에서 가져오기)
-if "aws_initialized" not in st.session_state:
-    try:
-        # AWS 자격 증명 가져오기
-        aws_access_key_id = st.secrets.get("AWS_ACCESS_KEY_ID", "")
-        aws_secret_access_key = st.secrets.get("AWS_SECRET_ACCESS_KEY", "")
-        aws_region = st.secrets.get("AWS_REGION", "ap-northeast-2")
-        s3_bucket_name = st.secrets.get("AWS_S3_BUCKET_NAME", "")
-        
-        # DB 매니저 초기화
-        st.session_state["dynamo_manager"] = DynamoDBManager(
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            region_name=aws_region
-        )
-        
-        # S3 매니저 초기화
-        if s3_bucket_name:
-            st.session_state["s3_manager"] = S3Manager(
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                region_name=aws_region,
-                bucket_name=s3_bucket_name
-            )
-        else:
-            st.session_state["s3_manager"] = None
-        
-        # 세션 매니저 초기화
-        st.session_state["session_manager"] = SessionManager(
-            dynamo_manager=st.session_state["dynamo_manager"]
-        )
-        
-        # Phase 2 매니저 초기화
-        st.session_state["phase2_manager"] = PhaseManager(
-            dynamo_manager=st.session_state["dynamo_manager"],
-            phase_num=2
-        )
-        
-        st.session_state["aws_initialized"] = True
-    except Exception as e:
-        st.warning(f"AWS 연결 초기화 실패: {e}")
-        st.session_state["aws_initialized"] = False
-        st.session_state["dynamo_manager"] = None
-        st.session_state["s3_manager"] = None
-        st.session_state["session_manager"] = None
-        st.session_state["phase2_manager"] = None
-
-
-# 세션 UUID 생성 및 초기화
-if "session_uuid" not in st.session_state:
-    st.session_state["session_uuid"] = str(uuid.uuid4())
-
-# 세션 생성/조회 (페이지 로드 시)
-if st.session_state.get("aws_initialized", False) and st.session_state.get("session_manager"):
-    try:
-        session_info = st.session_state["session_manager"].get_or_create_session(
-            session_uuid=st.session_state["session_uuid"],
-            user_id="anonymous"  # 필요시 사용자 ID로 변경
-        )
-        if session_info:
-            st.session_state["session_created"] = True
-    except Exception as e:
-        st.warning(f"세션 생성/조회 실패: {e}")
-        st.session_state["session_created"] = False
+# Phase 2 페이지 초기화
+initialize_session(phase_num=2)
 
 #--------------------------------#
 #             메인 UI             #
@@ -392,10 +330,10 @@ if st.session_state.get("show_predict_input", False):
                 # S3 업로드 실패해도 로컬 저장은 유지
 
         # 제출된 답변을 DB에 저장 (이미지 경로 포함)
-        submission_content = f"제출한 답변 (이유): {reason}" + "\n"
+        submission_content = f"[제출한 답변 (이유)]: {reason}" + "\n"
         if saved_image_path:
             if st.session_state.get("predict_saved_image_s3_path"):
-                submission_content += f"캔버스 이미지 S3 경로: {st.session_state['predict_saved_image_s3_path']}"
+                submission_content += f"[캔버스 이미지 S3 경로]: {st.session_state['predict_saved_image_s3_path']}"
         
         save_message_to_db(
             role="user",

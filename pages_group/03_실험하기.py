@@ -10,6 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from typing import List
 from PIL import Image
+from enum import Enum
 
 from langchain_openai import ChatOpenAI
 from openai import OpenAI as OpenAI_Client
@@ -29,6 +30,7 @@ from langchain_openai import ChatOpenAI
 # import simulation.simulation as simulation
 
 from modules.prompts import PEER_AI_03EXPERIMENT_PROMPT
+from modules.dynamo import initialize_session
 import dms.Intermediary as Intermediary
 
 set_verbose(False)
@@ -73,9 +75,19 @@ if "phase3_act_history" not in st.session_state:
 if "phase3_assess_history" not in st.session_state:
     st.session_state["phase3_assess_history"] = []
 
+# 대화 턴 추적을 위한 변수 추가
+if "phase3_current_turn" not in st.session_state:
+    st.session_state["phase3_current_turn"] = 0
+
 # 고유한 세션 ID 생성 (Streamlit 세션별로 고유)
 if "chain_session_id" not in st.session_state:
-    st.session_state["chain_session_id"] = str(uuid.uuid4())
+    # 세션 UUID가 없으면 생성
+    if "session_uuid" not in st.session_state:  
+        st.session_state["session_uuid"] = str(uuid.uuid4())
+        st.session_state["chain_session_id"] = st.session_state["session_uuid"]
+    # 세션 UUID가 있으면 세션 UUID를 체인 세션 ID로 사용
+    else:
+        st.session_state["chain_session_id"] = st.session_state["session_uuid"]
 
 
 def enalble_submit_button():
@@ -143,6 +155,42 @@ def sync_history_to_store(session_id: str, tutor_messages: List[ChatMessage]):
                 history.add_messages([HumanMessage(content=msg.content)])
             elif msg.role == "assistant":
                 history.add_messages([AIMessage(content=msg.content)])
+
+
+#--------------------------------#
+#            DynamoDB 설정        #
+#--------------------------------#
+# Phase 3 페이지 초기화
+initialize_session(phase_num=3)
+
+
+def save_message_to_db(role: str, content: str, content_type: str = "text", llm_model: str = None, turn: int = None):
+    """
+    메시지를 DynamoDB에 저장
+    """
+    if not st.session_state.get("phase3_manager"):
+        return False
+    
+    if not st.session_state.get("session_uuid"):
+        return False
+    
+    # turn이 제공되지 않으면 현재 턴 사용
+    if turn is None:
+        turn = st.session_state.get("phase3_current_turn", 0)
+    
+    try:
+        success = st.session_state["phase3_manager"].save_phase_message(
+            session_id=st.session_state["session_uuid"],
+            role=role,
+            content_type=content_type,
+            content=content,
+            llm_model=llm_model,
+            turn=turn
+        )
+        return success
+    except Exception as e:
+        print(f"메시지 저장 실패: {e}")
+        return False
 
 
 ######################################
@@ -476,6 +524,10 @@ with st.sidebar:
     # 만약에 사용자 입력이 들어오면...
     if user_input: # and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", False)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", False)):
 
+        # 새로운 턴 시작 (사용자 질문)
+        st.session_state["phase3_current_turn"] += 1
+        current_turn = st.session_state["phase3_current_turn"]
+
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             # 사용자의 입력
@@ -509,20 +561,79 @@ with st.sidebar:
             # Phase2 학습 맥락 추가
             phase2_context = get_phase2_learning_context()
 
-            print(phase2_context)
+            # print(phase2_context)
             
             # 시스템 프롬프트에 Phase2 맥락 추가
             full_system_prompt = PEER_AI_03EXPERIMENT_PROMPT + phase2_context
 
+            # 시스템 프롬프트 저장 (turn 포함)
+            save_message_to_db(
+                role="system",
+                content=full_system_prompt,
+                content_type="system_prompt",
+                turn=current_turn
+            )
+
+            # 시스템 프롬프트 저장 (turn 포함)
+            save_message_to_db(
+                role="system",
+                content=f"[Phase2 학습 맥락 정보]\n{phase2_context}",
+                content_type="pre_learning_context",
+                turn=current_turn
+            )
+
+            # assessment와 acts도 저장 (turn 포함)
+            if assessment:
+                # assessment가 이미 JSON 문자열이므로, 파싱 후 다시 직렬화하여 한글 유지
+                try:
+                    if isinstance(assessment, str):
+                        assessment_dict = json.loads(assessment)
+                    else:
+                        assessment_dict = assessment
+                    assessment_formatted = json.dumps(assessment_dict, ensure_ascii=False, indent=2)
+                except (json.JSONDecodeError, TypeError):
+                    # 파싱 실패 시 그대로 저장
+                    assessment_formatted = str(assessment)
+                
+                save_message_to_db(
+                    role="assistant",
+                    content=f"[Intermediary Assessment]\n{assessment_formatted}",
+                    content_type="intermediary_assessment",
+                    llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    turn=current_turn
+                )
+
+            if acts:
+                # Enum 객체를 문자열로 변환하여 JSON 직렬화 가능하게 만듦
+                acts_serializable = [act.name if isinstance(act, Enum) else str(act) for act in acts]
+                save_message_to_db(
+                    role="assistant",
+                    content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
+                    content_type="intermediary_acts",
+                    llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
+                    turn=current_turn
+                )
+
             # 답변 요청
             conv_chain = generate_chain(selected_model, full_system_prompt)
+
+            # LLM에 전달될 사용자 프롬프트 생성
+            user_prompt_for_llm = prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input
+
+            # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
+            save_message_to_db(
+                role="system",
+                content=f"[LLM에 전달된 사용자 프롬프트]\n{user_prompt_for_llm}",
+                content_type="llm_user_prompt",
+                turn=current_turn
+            )
 
             with messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR):
                 # 빈 공간(컨테이너)을 만들어서, 여기에 토큰을 스트리밍 출력한다.
                 container = st.empty()
                 generator = conv_chain.stream(
                     {
-                        "input": prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input,
+                        "input": user_prompt_for_llm,
                     },
                     config={"configurable": {"session_id": st.session_state["chain_session_id"]}}
                 )
@@ -534,6 +645,21 @@ with st.sidebar:
             # 대화기록을 저장한다.
             add_message("user", user_input)
             add_message("assistant", ai_answer)
+            
+            # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+            save_message_to_db(
+                role="user",
+                content=user_input,
+                content_type="text",
+                turn=current_turn
+            )
+            save_message_to_db(
+                role="assistant",
+                content=ai_answer,
+                content_type="text",
+                llm_model=selected_model,
+                turn=current_turn
+            )
 
 
 # Create columns with specific ratios
@@ -553,7 +679,7 @@ user_turns = sum(1 for m in st.session_state.get("tutor_messages", []) if getatt
 
 # 3턴 미만일 때 안내 메시지
 if user_turns < 3:
-    st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
+    st.info("좌측 사이드바의 **��AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
     st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
 
 # 조건을 만족하면 영구적으로 표시 플래그 설정

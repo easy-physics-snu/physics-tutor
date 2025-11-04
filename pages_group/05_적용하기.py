@@ -59,8 +59,8 @@ if "final_answer_submitted" not in st.session_state:
 if "show_sidebar_balloons" not in st.session_state:
     st.session_state["show_sidebar_balloons"] = False
 
-
-TUTOR_OPENAI_MODEL = "gpt-4.1-mini"
+##TODO 민선쌤 성능 이슈로 gpt-4.1 모델로 바꿨어요~
+TUTOR_OPENAI_MODEL = "gpt-4.1"
 SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]

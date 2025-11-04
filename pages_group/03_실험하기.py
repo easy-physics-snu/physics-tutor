@@ -79,15 +79,12 @@ if "phase3_assess_history" not in st.session_state:
 if "phase3_current_turn" not in st.session_state:
     st.session_state["phase3_current_turn"] = 0
 
-# 고유한 세션 ID 생성 (Streamlit 세션별로 고유)
+# initialize_session()이 이미 session_uuid를 설정하므로, 여기서는 체인 세션 ID만 설정
 if "chain_session_id" not in st.session_state:
-    # 세션 UUID가 없으면 생성
-    if "session_uuid" not in st.session_state:  
+    # session_uuid가 없으면 (이론적으로는 없어야 하지만 안전장치)
+    if "session_uuid" not in st.session_state:
         st.session_state["session_uuid"] = str(uuid.uuid4())
-        st.session_state["chain_session_id"] = st.session_state["session_uuid"]
-    # 세션 UUID가 있으면 세션 UUID를 체인 세션 ID로 사용
-    else:
-        st.session_state["chain_session_id"] = st.session_state["session_uuid"]
+    st.session_state["chain_session_id"] = st.session_state["session_uuid"]
 
 
 def enalble_submit_button():
@@ -679,7 +676,7 @@ user_turns = sum(1 for m in st.session_state.get("tutor_messages", []) if getatt
 
 # 3턴 미만일 때 안내 메시지
 if user_turns < 3:
-    st.info("좌측 사이드바의 **��AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
+    st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
     st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
 
 # 조건을 만족하면 영구적으로 표시 플래그 설정

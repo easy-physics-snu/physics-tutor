@@ -1,14 +1,11 @@
 import os
 import boto3
-from boto3.dynamodb.conditions import Key, Attr
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import NoCredentialsError, ClientError
-import pandas as pd
-import io
 import traceback
 import uuid
-import json
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, List
 from decimal import Decimal
 import streamlit as st
 
@@ -434,3 +431,119 @@ def datetime_to_timestamp(dt: datetime) -> Decimal:
 def timestamp_to_datetime(timestamp: Decimal) -> datetime:
     """DynamoDB timestamp를 datetime으로 변환"""
     return datetime.fromtimestamp(float(timestamp))
+
+
+#--------------------------------#
+#       공통 초기화 함수들        #
+#--------------------------------#
+
+def initialize_aws_services():
+    """
+    AWS 서비스 초기화 (전역 - 한 번만 실행)
+    이미 초기화되어 있으면 재사용
+    """
+    if "aws_initialized" in st.session_state and st.session_state.get("aws_initialized"):
+        # 이미 초기화됨
+        return True
+    
+    try:
+        aws_access_key_id = st.secrets.get("AWS_ACCESS_KEY_ID", "")
+        aws_secret_access_key = st.secrets.get("AWS_SECRET_ACCESS_KEY", "")
+        aws_region = st.secrets.get("AWS_REGION", "ap-northeast-2")
+        s3_bucket_name = st.secrets.get("AWS_S3_BUCKET_NAME", "")
+        
+        st.session_state["dynamo_manager"] = DynamoDBManager(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            region_name=aws_region
+        )
+        
+        if s3_bucket_name:
+            st.session_state["s3_manager"] = S3Manager(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                region_name=aws_region,
+                bucket_name=s3_bucket_name
+            )
+        else:
+            st.session_state["s3_manager"] = None
+        
+        st.session_state["session_manager"] = SessionManager(
+            dynamo_manager=st.session_state["dynamo_manager"]
+        )
+        
+        st.session_state["aws_initialized"] = True
+        return True
+    except Exception as e:
+        st.warning(f"AWS 연결 초기화 실패: {e}")
+        st.session_state["aws_initialized"] = False
+        st.session_state["dynamo_manager"] = None
+        st.session_state["s3_manager"] = None
+        st.session_state["session_manager"] = None
+        return False
+
+
+def ensure_phase_manager(phase_num: int) -> Optional[PhaseManager]:
+    """
+    해당 Phase의 PhaseManager가 존재하는지 확인하고, 없으면 생성
+    
+    Args:
+        phase_num: Phase 번호 (1-5)
+    
+    Returns:
+        PhaseManager 인스턴스 또는 None (실패 시)
+    """
+    if phase_num < 1 or phase_num > 5:
+        raise ValueError("Phase number must be between 1 and 5")
+    
+    manager_key = f"phase{phase_num}_manager"
+    
+    # 이미 존재하면 재사용
+    if manager_key in st.session_state and st.session_state[manager_key] is not None:
+        return st.session_state[manager_key]
+    
+    # AWS 서비스 먼저 초기화
+    if not initialize_aws_services():
+        return None
+    
+    # PhaseManager 생성
+    try:
+        dynamo_manager = st.session_state.get("dynamo_manager")
+        phase_manager = PhaseManager(dynamo_manager=dynamo_manager, phase_num=phase_num)
+        st.session_state[manager_key] = phase_manager
+        return phase_manager
+    except Exception as e:
+        st.warning(f"Phase {phase_num} 매니저 초기화 실패: {e}")
+        return None
+
+
+def initialize_session(phase_num: int):
+    """
+    페이지별 초기화 - 한 번의 호출로 모든 필요한 초기화 수행
+    
+    Args:
+        phase_num: Phase 번호 (1-5)
+    """
+    # 1. AWS 서비스 초기화
+    initialize_aws_services()
+    
+    # 2. PhaseManager 보장 (핵심!)
+    ensure_phase_manager(phase_num)
+    
+    # 3. Session UUID 생성 (단순 처리)
+    if "session_uuid" not in st.session_state:
+        st.session_state["session_uuid"] = str(uuid.uuid4())
+    
+    # 4. 세션 생성/조회
+    session_manager = st.session_state.get("session_manager")
+    session_uuid = st.session_state.get("session_uuid")
+    if session_manager and session_uuid:
+        try:
+            session_info = session_manager.get_or_create_session(
+                session_uuid=session_uuid,
+                user_id="anonymous"
+            )
+            if session_info:
+                st.session_state["session_created"] = True
+        except Exception as e:
+            st.warning(f"세션 생성/조회 실패: {e}")

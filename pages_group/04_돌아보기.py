@@ -469,7 +469,28 @@ with tab1:
         st.session_state["explanation_saved_image_path"] = saved_image_path
         st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
         st.success("제출 완료! 상단의 '문제 정답' 탭에서 답을 확인해보세요:)")
-        st.image("src/images/find_answer_guide.png", caption="'문제 정답' 탭 위치", width=500)
+        # find_answer_guide.png 이미지 크기 조정 - 우선순위 높임
+        st.markdown(
+            """
+            <style>
+            /* Streamlit 컨테이너를 타겟팅하는 더 구체적인 선택자 */
+            div[data-testid="stImage"] img[src*="find_answer_guide.png"],
+            div[data-testid="stImageContainer"] img[src*="find_answer_guide.png"],
+            img[src*="find_answer_guide.png"],
+            img[alt*="find_answer_guide"],
+            div img[src*="find_answer_guide.png"] {
+                width: 50% !important;
+                max-width: 50% !important;
+                height: auto !important;
+                max-height: none !important;
+                object-fit: contain !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        st.image("src/images/find_answer_guide.png", caption="'문제 정답' 탭 위치", use_container_width=False)
 
 
 with tab2:

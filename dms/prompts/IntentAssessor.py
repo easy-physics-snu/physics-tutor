@@ -84,8 +84,31 @@ Analyze the last student's utterance.
       # postprocess make sure the format is right
       s = response.find('{')
       e = response.rfind('}')
+      
+      # Error handling: Check if braces are found
+      if s == -1 or e == -1 or s >= e:
+          # Log the raw response for debugging
+          print(f"ERROR: Invalid JSON response from LLM. Raw response: {completion.choices[0].message.content}")
+          print(f"Processed response: {response}")
+          # Return a default assessment or raise a more informative error
+          raise ValueError(
+              f"LLM response does not contain valid JSON. "
+              f"Expected JSON object but got: {completion.choices[0].message.content[:200]}"
+          )
+      
       response = response[s:e+1]
-      json_data = json.loads(response)
+
+      try:
+          json_data = json.loads(response)
+      except json.JSONDecodeError as e:
+          # Log the problematic response for debugging
+          print(f"ERROR: Failed to parse JSON. Response slice: {response}")
+          print(f"Full processed response: {completion.choices[0].message.content}")
+          raise ValueError(
+              f"Failed to parse JSON from LLM response: {str(e)}\n"
+              f"Response content: {response[:500]}"
+          ) from e
+
       selection = json_data['selection']
       selection = selection.replace(' ','').replace(',','')
       json_data['selection'] = selection

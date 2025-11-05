@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import time
+import uuid
 # # from pydantic import BaseModel, Field
 # from langchain_core.messages.chat import ChatMessage
 # from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -14,6 +15,9 @@ import time
 # # from langchain_teddynote import logging
 from openai import OpenAI
 
+# DynamoDB 관련 import 추가
+from modules.dynamo import initialize_session
+
 # 로그인 상태 확인
 if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
     st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
@@ -25,8 +29,7 @@ st.session_state.api_key = st.secrets["openai_api_key"]
 
 # 각 사용자별 고유 세션 ID 생성
 if "unique_session_id" not in st.session_state:
-    import uuid
-    st.session_state["unique_session_id"] = str(uuid.uuid4())
+    st.session_state["unique_session_id"] = st.session_state.get("session_uuid", str(uuid.uuid4()))
 
 # 대화 기록 초기화 (적용하기 페이지 전용)
 if "chat_history_applying" not in st.session_state:
@@ -66,6 +69,10 @@ if "final_answer_submitted" not in st.session_state:
 if "show_sidebar_balloons" not in st.session_state:
     st.session_state["show_sidebar_balloons"] = False
 
+# 대화 턴 추적을 위한 변수 추가
+if "phase5_current_turn" not in st.session_state:
+    st.session_state["phase5_current_turn"] = 0
+
 ##TODO 민선쌤 성능 이슈로 gpt-4.1 모델로 바꿨어요~
 TUTOR_OPENAI_MODEL = "gpt-4.1"
 SIDEBAR_AI_AVATAR = "src/images/ai_tutor_avatar.png"
@@ -100,6 +107,39 @@ def score_to_stars(score):
     else:
         return "⭐⭐⭐⭐⭐"
 
+#--------------------------------#
+#            DynamoDB 설정        #
+#--------------------------------#
+def save_message_to_db(role: str, content: str, content_type: str = "text", llm_model: str = None, turn: int = None):
+    """
+    메시지를 DynamoDB에 저장
+    """
+    if not st.session_state.get("phase5_manager"):
+        return False
+    
+    if not st.session_state.get("session_uuid"):
+        return False
+    
+    # turn이 제공되지 않으면 현재 턴 사용
+    if turn is None:
+        turn = st.session_state.get("phase5_current_turn", 0)
+    
+    try:
+        success = st.session_state["phase5_manager"].save_phase_message(
+            session_id=st.session_state["session_uuid"],
+            role=role,
+            content_type=content_type,
+            content=content,
+            llm_model=llm_model,
+            turn=turn
+        )
+        return success
+    except Exception as e:
+        print(f"메시지 저장 실패: {e}")
+        return False
+
+# Phase 5 페이지 초기화
+initialize_session(phase_num=5)
 
 ######################################
 ########### Mainpage Logic ###########
@@ -301,6 +341,9 @@ def evaluate_answer_with_llm(user_answer):
     """LLM을 사용하여 학생 답변을 평가하는 함수"""
     try:
         client = OpenAI(api_key=st.session_state.api_key)
+        
+        # 현재 턴 가져오기
+        current_turn = st.session_state.get("phase5_current_turn", 0)
         
         # 정답 예시 목록
         correct_answers_text = "\n".join([f"- {ans}" for ans in applyingModeledAnswer])
@@ -526,6 +569,14 @@ def evaluate_answer_with_llm(user_answer):
 잘못된개념: [달 중심 같은 물리적 오류만. 없으면 빈 괄호만 표시: []]
 피드백: [위 예시 패턴을 따라, 구체적이고 질문 형태로, 세 문장 이내]"""
 
+        # LLM에 전달된 평가 프롬프트를 DB에 저장
+        save_message_to_db(
+            role="system",
+            content=f"[LLM에 전달된 평가 프롬프트]\n{prompt}",
+            content_type="llm_evaluation_prompt",
+            turn=current_turn
+        )
+
         response = client.chat.completions.create(
             model=TUTOR_OPENAI_MODEL,
             messages=[
@@ -537,10 +588,19 @@ def evaluate_answer_with_llm(user_answer):
         )
         
         evaluation = response.choices[0].message.content
-        print("=== LLM 평가 결과 ===")
-        print(evaluation)
-        print("=" * 50)
-        
+        # print("=== LLM 평가 결과 ===")
+        # print(evaluation)
+        # print("=" * 50)
+
+        # LLM 평가 결과를 DB에 저장
+        save_message_to_db(
+            role="assistant",
+            content=f"[LLM 평가 결과]\n{evaluation}",
+            content_type="llm_evaluation_result",
+            llm_model=TUTOR_OPENAI_MODEL,
+            turn=current_turn
+        )
+
         # 파싱
         lines = evaluation.split("\n")
         is_correct = "정답" in lines[0]
@@ -606,9 +666,22 @@ def process_answer(user_input):
     
     st.session_state["is_processing"] = True
     
+    # 새로운 턴 시작 (사용자 답변 제출)
+    st.session_state["phase5_current_turn"] += 1
+    current_turn = st.session_state["phase5_current_turn"]
+
     # 사용자 입력을 먼저 대화 기록에 추가
-    add_message_to_history("user", f"(제출한 답변): {user_input}")
+    user_message = f"(제출한 답변): {user_input}"
+    add_message_to_history("user", user_message)
     
+    # 사용자 답변을 DB에 저장
+    save_message_to_db(
+        role="user",
+        content=user_message,
+        content_type="user_query",
+        turn=current_turn
+    )
+
     # End 상태면 입력을 처리하지 않음
     if st.session_state.get("conversation_completed", False):
         st.session_state["is_processing"] = False
@@ -642,6 +715,15 @@ def process_answer(user_input):
         
         add_message_to_history("assistant", completion_msg)
         
+        # 정답 피드백을 DB에 저장
+        save_message_to_db(
+            role="assistant",
+            content=completion_msg,
+            content_type="Phase5_quiz_success",
+            llm_model=TUTOR_OPENAI_MODEL,
+            turn=current_turn
+        )
+
         # 대화 종료 플래그 설정
         st.session_state["conversation_completed"] = True
         # 사이드바 풍선 효과를 위한 플래그 설정
@@ -652,6 +734,15 @@ def process_answer(user_input):
         feedback_msg = f"**현재 점수: {stars}**\n\n{ai_feedback}"
         add_message_to_history("assistant", feedback_msg)
     
+        # 오답 피드백을 DB에 저장
+        save_message_to_db(
+            role="assistant",
+            content=feedback_msg,
+            content_type="ai_feedback",
+            llm_model=TUTOR_OPENAI_MODEL,
+            turn=current_turn
+        )
+
     # 상태 메시지 제거
     status_container.empty()
     st.session_state["is_processing"] = False
@@ -689,9 +780,19 @@ if not st.session_state.get("show_resources", False):
         if not st.session_state.get("completion_balloons_done", False):
             st.balloons()
             st.session_state["completion_balloons_done"] = True
-        
+
+            # 최종 답안 제출 완료 후 "더 알아보기" 버튼 표시를 DB에 저장
+            save_message_to_db(
+                role="assistant",
+                content="최종 답안 제출 완료",
+                content_type="final_answer_submitted",
+                turn=st.session_state.get("phase5_current_turn", 0)
+            )
+
         st.markdown("---")
         st.markdown("### 🎉 축하합니다! '더 알아보기' 버튼을 눌러 비슷한 사례를 확인하고 오늘 수업을 마무리해보세요")
+
+
         if st.button("📚 더 알아보기", type="primary", use_container_width=True, key="main_show_resources_button"):
             st.session_state["show_resources"] = True
             st.rerun()
@@ -787,10 +888,20 @@ with st.sidebar:
 
     # 초기 메시지 추가 (한 번만)
     if len(st.session_state.chat_history_applying) == 0:
-        add_message_to_history("assistant", 
+        initial_message = (
             "앞서 '생각하기'부터 '돌아보기' 단계까지 행성 주변을 도는 인공위성의 원운동을 배웠죠? 🛰️\n\n"
             "이번에는 비슷하지만 조금 다른 상황을 생각해볼까요. 지구 주변을 도는 달도 원운동을 하고 있어요. 🌙\n\n"
-            "인공위성과 달, 이 둘의 운동에는 어떤 공통점이 있을까요? 같은 물리 원리로 설명될 수 있을까요?")
+            "인공위성과 달, 이 둘의 운동에는 어떤 공통점이 있을까요? 같은 물리 원리로 설명될 수 있을까요?"
+        )
+        add_message_to_history("assistant", initial_message)
+        
+        # 초기 메시지를 DB에 저장
+        save_message_to_db(
+            role="assistant",
+            content=initial_message,
+            content_type="ai_question",
+            turn=0
+        )
 
     # 채팅 히스토리 표시
     display_chat_history()

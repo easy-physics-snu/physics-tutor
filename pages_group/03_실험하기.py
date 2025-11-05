@@ -2,7 +2,6 @@ import re
 import os
 import io
 import time
-import sys
 import base64
 import uuid
 import json
@@ -69,9 +68,9 @@ if "tutor_messages" not in st.session_state:
     # 대화기록을 저장하기 위한 용도로 생성한다.
     st.session_state["tutor_messages"] = []
 
-# '다음단계로' 버튼 표시 여부를 영구적으로 기록
-if "can_proceed_to_next" not in st.session_state:
-    st.session_state["can_proceed_to_next"] = False
+# '다음단계로' 버튼 표시 여부를 페이지별로 기록 (Phase3 전용)
+if "phase3_can_proceed_to_next" not in st.session_state:
+    st.session_state["phase3_can_proceed_to_next"] = False
 
 if "phase3_intermediary" not in st.session_state:
     st.session_state["phase3_intermediary"] = None
@@ -532,10 +531,18 @@ with st.sidebar:
         st.session_state["phase3_current_turn"] += 1
         current_turn = st.session_state["phase3_current_turn"]
 
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
 
-            # 사용자의 입력
-            messages.chat_message("user").write(user_input)
+        # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+        save_message_to_db(
+            role="user",
+            content=user_input,
+            content_type="user_query",
+            turn=current_turn
+        )
+
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             if st.session_state["phase3_intermediary"] is None:
                 intermediary = Intermediary.Intermediary(
@@ -602,7 +609,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Assessment]\n{assessment_formatted}",
-                    content_type="intermediary_assessment",
+                    content_type="intent_assess",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -613,7 +620,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
-                    content_type="intermediary_acts",
+                    content_type="dialog_acts",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -650,17 +657,10 @@ with st.sidebar:
             add_message("user", user_input)
             add_message("assistant", ai_answer)
             
-            # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
-            save_message_to_db(
-                role="user",
-                content=user_input,
-                content_type="text",
-                turn=current_turn
-            )
             save_message_to_db(
                 role="assistant",
                 content=ai_answer,
-                content_type="text",
+                content_type="ai_answer",
                 llm_model=selected_model,
                 turn=current_turn
             )
@@ -686,12 +686,12 @@ if user_turns < 3:
     st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
     st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
 
-# 조건을 만족하면 영구적으로 표시 플래그 설정
+# 조건을 만족하면 Phase3 전용 플래그 설정
 if user_turns >= 3:
-    st.session_state["can_proceed_to_next"] = True
+    st.session_state["phase3_can_proceed_to_next"] = True
 
-# 플래그가 True면 버튼 표시
-if st.session_state.get("can_proceed_to_next", False):
+# 실제 턴수를 확인하여 버튼 표시 (페이지별 플래그 사용으로 다른 페이지 영향 방지)
+if st.session_state.get("phase3_can_proceed_to_next", False) and user_turns >= 3:
     # Place the button in the last column
     with col3:
         if st.button(

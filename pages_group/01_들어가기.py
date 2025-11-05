@@ -4,6 +4,8 @@ import pandas as pd
 
 from openai import OpenAI
 
+from modules.dynamo import initialize_session
+
 # from langchain_teddynote import logging
 
 # 로그인 상태 확인
@@ -59,6 +61,8 @@ if "intro_1_tutor_messages" not in st.session_state:
 if "balloons_done" not in st.session_state:
     st.session_state["balloons_done"] = False
 
+if "phase1_current_turn" not in st.session_state:
+    st.session_state["phase1_current_turn"] = 0
 
 # # 파일 업로드 후 retriever 생성 (작업시간이 오래 걸릴 예정...)
 # if "pdf_retriever" not in st.session_state:
@@ -70,6 +74,40 @@ if "balloons_done" not in st.session_state:
 #     st.session_state["pdf_chain"] = create_chain(
 #         retriever, prompt_path=RAG_SYSTEM_PROMPT, model_name=RAG_OPENAI_MODEL
 #     )
+
+#--------------------------------#
+#            DynamoDB 설정        #
+#--------------------------------#
+def save_message_to_db(role: str, content: str, content_type: str = "text", llm_model: str = None, turn: int = None):
+    """
+    메시지를 DynamoDB에 저장
+    """
+    if not st.session_state.get("phase1_manager"):
+        return False
+    
+    if not st.session_state.get("session_uuid"):
+        return False
+    
+    # turn이 제공되지 않으면 현재 턴 사용
+    if turn is None:
+        turn = st.session_state.get("phase1_current_turn", 0)
+    
+    try:
+        success = st.session_state["phase1_manager"].save_phase_message(
+            session_id=st.session_state["session_uuid"],
+            role=role,
+            content_type=content_type,
+            content=content,
+            llm_model=llm_model,
+            turn=turn
+        )
+        return success
+    except Exception as e:
+        print(f"메시지 저장 실패: {e}")
+        return False
+
+# Phase 1 페이지 초기화
+initialize_session(phase_num=1)
 
 ######################################
 ########### Mainpage Logic ###########
@@ -376,11 +414,17 @@ with tab1:
                 wrong_by_ride[ride] = wrong_parts
         
         if is_correct:
-                                        st.session_state.q1 = True
-                                        info_q1.success("정답입니다!")
-                                        if not st.session_state.balloons_t1_q1:
-                                            st.balloons()
-                                            st.session_state.balloons_t1_q1 = True
+            st.session_state.q1 = True
+            info_q1.success("정답입니다!")
+            if not st.session_state.balloons_t1_q1:
+                st.balloons()
+                st.session_state.balloons_t1_q1 = True
+                save_message_to_db(
+                    role="ui",
+                    content="정답입니다!",
+                    content_type="tab1_quiz_1_success",
+                    turn=st.session_state.get("phase1_current_turn", 0)
+                )
         else:
             if st.session_state.q1:
                 info_q1.success("정답입니다!")
@@ -471,11 +515,17 @@ with tab1:
             wrong_rides.update(missing)
         
         if is_correct:
-                    st.session_state.q2 = True
-                    info_q2.success("정답입니다!")
-                    if not st.session_state.balloons_t1_q2:
-                        st.balloons()
-                        st.session_state.balloons_t1_q2 = True
+            st.session_state.q2 = True
+            info_q2.success("정답입니다!")
+            if not st.session_state.balloons_t1_q2:
+                st.balloons()
+                st.session_state.balloons_t1_q2 = True
+                save_message_to_db(
+                    role="ui",
+                    content="정답입니다!",
+                    content_type="tab1_quiz_2_success",
+                    turn=st.session_state.get("phase1_current_turn", 0)
+                )
         else:
             if st.session_state.q2:
                 info_q2.success("정답입니다!")
@@ -493,13 +543,16 @@ with tab1:
         if st.session_state.q2:
             info_q2.success("정답입니다!")
         else:
+            error_msg = ""
             missing_rides = set(all_rides) - set(selected_rides)
             if missing_rides:
-                info_q2.warning(f"모든 놀이 기구를 분류해주세요. 아직 고르지 않은 항목: {', '.join(sorted(missing_rides))}")
+                error_msg = f"모든 놀이 기구를 분류해주세요. 아직 고르지 않은 항목: {', '.join(sorted(missing_rides))}"
+                info_q2.warning(error_msg)
             else:
                 # 중복 선택이 있는 경우
                 if len(selected_rides) > len(set(selected_rides)):
-                    info_q2.warning("각 놀이 기구는 하나의 분류에만 속해야 합니다. 하나의 놀이기구가 여러 군데에 들어가지 않도록 해주세요")
+                    error_msg = "각 놀이 기구는 하나의 분류에만 속해야 합니다. 하나의 놀이기구가 여러 군데에 들어가지 않도록 해주세요"
+                    info_q2.warning(error_msg)
                 else:
                     # 카테고리가 비어있는 경우
                     missing = []
@@ -510,7 +563,8 @@ with tab1:
                     if not options_3:
                         missing.append("속력과 운동 방향이 모두 변하는 운동")
                     if missing:
-                        info_q2.warning(f"다음 항목을 선택해주세요: {', '.join(missing)}")
+                        error_msg = f"다음 항목을 선택해주세요: {', '.join(missing)}"
+                        info_q2.warning(error_msg)
 
     if st.session_state.q1 and st.session_state.q2:
         st.subheader("**핵심 정리!**")
@@ -606,6 +660,9 @@ with tab2:
             client = OpenAI(api_key=st.session_state.api_key)
             current_q = QUESTIONS[question_type]
             
+            # 현재 턴 가져오기 (process_answer에서 설정된 턴 사용)
+            current_turn = st.session_state.get("phase1_current_turn", 0)
+
             # 정답 예시 목록 가져오기
             if 'correct_answers' in current_q:
                 correct_answers_text = "\n".join([f"- {ans}" for ans in current_q['correct_answers']])
@@ -694,6 +751,14 @@ with tab2:
 판정: [정답/오답]
 피드백: [세 문장 이내로 작성]"""
 
+            # LLM에 전달된 사용자 프롬프트를 DB에 저장
+            save_message_to_db(
+                role="system",
+                content=f"[LLM에 전달된 평가 프롬프트]\n{prompt}",
+                content_type="llm_evaluation_prompt",
+                turn=current_turn
+            )
+
             response = client.chat.completions.create(
                 model=TUTOR_OPENAI_MODEL,
                 messages=[
@@ -705,7 +770,16 @@ with tab2:
             )
             
             evaluation = response.choices[0].message.content
-            
+
+            # LLM 평가 결과를 DB에 저장
+            save_message_to_db(
+                role="system",
+                content=f"[LLM 평가 결과]\n{evaluation}",
+                content_type="llm_evaluation_result",
+                llm_model=TUTOR_OPENAI_MODEL,
+                turn=current_turn
+            )
+
             # 판정 결과 추출
             is_correct = "정답" in evaluation.split("\n")[0]
             
@@ -748,12 +822,24 @@ with tab2:
         # 사용자 입력을 먼저 대화 기록에 추가
         add_message_to_history("user", user_input)
         
+        # 새로운 턴 시작 (사용자 답변 제출)
+        st.session_state["phase1_current_turn"] += 1
+        current_turn = st.session_state["phase1_current_turn"]
+        
         current_q = QUESTIONS[st.session_state.current_question]
         
         # End 상태면 입력을 처리하지 않음
         if 'is_end' in current_q and current_q['is_end']:
             return
-        
+
+        # 사용자 답변을 DB에 저장
+        save_message_to_db(
+            role="user",
+            content=user_input,
+            content_type="user_query",
+            turn=current_turn
+        )
+
         # AI 응답 생성 중 상태 표시
         with status_container:
             st.info("🤔 AI가 답변을 생성중입니다...")
@@ -774,6 +860,13 @@ with tab2:
             
             add_message_to_history("assistant", feedback, image_path)
             
+            save_message_to_db(
+                role="assistant",
+                content=feedback,
+                content_type="tab2_quiz_success",
+                turn=current_turn
+            )
+            
             # 다음 문제로 이동
             next_questions = {'Q1': 'Q2', 'Q2': 'Q3', 'Q3': 'End'}
             next_q = next_questions[st.session_state.current_question]
@@ -781,12 +874,39 @@ with tab2:
             if next_q:
                 st.session_state.current_question = next_q
                 if next_q != 'End':
-                    add_message_to_history("assistant", QUESTIONS[next_q]['question'])
+                    next_question_text = QUESTIONS[next_q]['question']
+                    add_message_to_history("assistant", next_question_text)
+
+                    # 다음 문제 질문을 DB에 저장 (새 턴 시작)
+                    save_message_to_db(
+                        role="assistant",
+                        content=next_question_text,
+                        content_type="ai_question",
+                        turn=current_turn + 1
+                    )
                 else:
-                    add_message_to_history("assistant", QUESTIONS['End']['question'])
+                    end_message = QUESTIONS['End']['question']
+                    add_message_to_history("assistant", end_message)
+                    
+                    # 종료 메시지를 DB에 저장
+                    save_message_to_db(
+                        role="assistant",
+                        content=end_message,
+                        content_type="ai_question",
+                        turn=current_turn
+                    )
         else:
             # 오답인 경우 - LLM이 생성한 맞춤형 피드백 사용 (힌트 포함)
             add_message_to_history("assistant", ai_feedback)
+            
+            # 종료 메시지를 DB에 저장
+            save_message_to_db(
+                role="assistant",
+                content=ai_feedback,
+                content_type="ai_feedback",
+                llm_model=TUTOR_OPENAI_MODEL,
+                turn=current_turn
+            )
 
         # 상태 메시지 제거
         status_container.empty()
@@ -873,7 +993,16 @@ with tab2:
 
     # 초기 메시지 추가 (한 번만)
     if len(st.session_state.chat_history) == 0:
-        add_message_to_history("assistant", current_q['question'])
+        initial_question = current_q['question']
+        add_message_to_history("assistant", initial_question)
+
+        # 초기 질문을 DB에 저장 (첫 턴)
+        save_message_to_db(
+            role="assistant",
+            content=initial_question,
+            content_type="tab2_initial_question",
+            turn=0
+        )
 
     # 채팅 히스토리 표시 (한 곳에서만 호출)
     display_chat_history()
@@ -887,6 +1016,11 @@ with tab2:
         if not st.session_state.balloons_done:
             st.balloons()
             st.session_state.balloons_done = True
+            save_message_to_db(
+                role="ui",
+                content="Tab2 복습이 완료되었습니다.",
+                content_type="tab2_end",
+            )
 
     # End 상태일 때는 입력창을 비활성화
     placeholder = "질문에 대한 답변을 작성해주세요." if not is_end else "복습이 완료되었습니다."

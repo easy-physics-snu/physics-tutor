@@ -737,7 +737,28 @@ if st.session_state.get("show_resources", False):
 
         with tab1:
             st.write("⏬ 아래 기사를 참고해보세요 ⏬ (기사 제목 클릭)")
-            st.page_link(page="https://blog.hyundai-rotem.co.kr/671", label="<철도에 사용되는 과학기술: 고속 주행에도 안전한 커브는 OOO덕분?!>")
+            st.markdown(
+                """
+                <style>
+                .article-link {
+                    font-size: 1.5em;
+                    font-weight: bold;
+                }
+                .article-link a {
+                    text-decoration: underline;
+                    color: #0066cc;
+                }
+                .article-link a:hover {
+                    text-decoration: underline;
+                    color: #004499;
+                }
+                </style>
+                <div class="article-link">
+                    <a href="https://blog.hyundai-rotem.co.kr/671" target="_blank">철도에 사용되는 과학기술: 고속 주행에도 안전한 커브는 OOO덕분?!</a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             st.image("https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdna%2Fc4OysX%2FbtruRMLUUsC%2FAAAAAAAAAAAAAAAAAAAAAJfF5rx9v7vc9kbmx8Ez9-eVnTSHIXqTV7EEN-OPyi4r%2Fimg.jpg%3Fcredential%3DyqXZFxpELC7KVnFOS48ylbz2pIh7yKj8%26expires%3D1759244399%26allow_ip%3D%26allow_referer%3D%26signature%3DufVaE0921PMCrw57Gpu%252FanjcQZs%253D")
 
         with tab2:

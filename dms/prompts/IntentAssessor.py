@@ -74,7 +74,7 @@ Analyze the last student's utterance.
          model=self.model,
          messages=prompt,
          response_format = {"type": "json_object"},
-         max_tokens=300, # should never be reached
+         # max_tokens=300, # should never be reached / # 제거: 모델이 필요한 만큼 토큰을 사용하도록 허용
          temperature=0.0,
          top_p=0.1
       )

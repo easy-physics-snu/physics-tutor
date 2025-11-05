@@ -87,6 +87,10 @@ if "phase4_assess_history" not in st.session_state:
 if "phase4_current_turn" not in st.session_state:
     st.session_state["phase4_current_turn"] = 0
 
+# 제출 횟수 추적을 위한 변수 추가
+if "phase4_submission_count" not in st.session_state:
+    st.session_state["phase4_submission_count"] = 0
+
 def save_draw_image(numpy_array):
     """
     캔버스 이미지와 사용자 그림을 합성하여 저장합니다.
@@ -579,6 +583,9 @@ with tab1:
         st.session_state["explanation_saved_image_path"] = saved_image_path
         st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
 
+        # 제출 횟수 증가
+        st.session_state["phase4_submission_count"] = st.session_state.get("phase4_submission_count", 0) + 1
+
         # 새로운 턴 시작 (사용자 답안 제출)
         st.session_state["phase4_current_turn"] += 1
         current_turn = st.session_state["phase4_current_turn"]
@@ -749,6 +756,21 @@ with st.sidebar:
         user_submit_input = f"(제출한 답변): {st.session_state['explanation_user_reason']}"
         messages.chat_message("user").write(user_submit_input)        
 
+        # 제출 횟수가 5번 이상이면 자동 안내 메시지 표시
+        submission_count = st.session_state.get("phase4_submission_count", 0)
+        if submission_count >= 5:
+            # 자동 안내 메시지
+            guide_message = "메인 화면에 '문제 정답' 탭에서 모범 답안을 확인해보세요."
+            messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write(guide_message)
+
+            add_message("assistant", guide_message)
+            save_message_to_db(
+                role="assistant",
+                content=guide_message,
+                content_type="guide_message",
+                turn=current_turn
+            )
+
         # 비동기 처리를 위한 placeholder
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
@@ -834,8 +856,10 @@ with st.sidebar:
                 # 이미지 파일을 bytesio로 변환후 path 반환 처리
                 image_filepath = process_png_to_bytesio(st.session_state["explanation_saved_image_path"])
 
+                canonical_solution = "행성의 중력으로 인해 인공위성에 작용하는 알짜힘의 방향은 행성의 중심을 향하며, 이 힘은 인공위성의 운동 방향과 수직으로 작용한다. 따라서 인공위성은 속도의 크기는 일정하게 유지되지만 방향이 계속 바뀌며 행성 주위를 도는 등속 원운동을 하게 된다."
+
                 # LLM에 전달될 사용자 프롬프트 생성
-                user_prompt_for_llm = f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}"
+                user_prompt_for_llm = f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n<모범답안>\n{canonical_solution}\n\n---\n\n다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}"
 
                 # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
                 save_message_to_db(
@@ -911,11 +935,25 @@ with st.sidebar:
         # 새로운 턴 시작 (사용자 질문)
         st.session_state["phase4_current_turn"] += 1
         current_turn = st.session_state["phase4_current_turn"]
-        
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
-            # 사용자의 입력
-            messages.chat_message("user").write(user_input)
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
+
+        # 제출 횟수가 5번 이상이면 자동 안내 메시지 표시
+        submission_count = st.session_state.get("phase4_submission_count", 0)
+        if submission_count >= 5:
+            # 자동 안내 메시지
+            guide_message = "메인 화면에 '문제 정답' 탭에서 모범 답안을 확인해보세요."
+            messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write(guide_message)
+            add_message("assistant", guide_message)
+            save_message_to_db(
+                role="assistant",
+                content=guide_message,
+                content_type="guide_message",
+                turn=current_turn
+            )
+
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             # Intermediary 로직 (Phase 4)
             if st.session_state["phase4_intermediary"] is None:

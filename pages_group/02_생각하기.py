@@ -245,8 +245,8 @@ with st.expander(
             image=PROBLEM_IMAGE_PATH,
         )
 
-# 사이드바 튜터 대화 턴(사용자 메시지 수) 확인 후 게이트
-user_turns = sum(1 for m in st.session_state.get("messages_predict", []) if getattr(m, "role", None) == "user")
+# 사이드바 튜터 대화 턴(사용자 메시지 수) 확인
+user_turns = st.session_state.get("phase2_current_turn", 0)
 
 if user_turns < 3:
     st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 아래 정답 입력창이 열립니다.")

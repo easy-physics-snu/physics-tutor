@@ -679,7 +679,7 @@ with col1:
         st.switch_page("pages_group/02_생각하기.py")
 
 # 사이드바 튜터 대화 턴(사용자 메시지 수) 확인
-user_turns = sum(1 for m in st.session_state.get("tutor_messages", []) if getattr(m, "role", None) == "user")
+user_turns = st.session_state.get("phase3_current_turn", 0)
 
 # 3턴 미만일 때 안내 메시지
 if user_turns < 3:

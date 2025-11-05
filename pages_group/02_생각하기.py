@@ -21,6 +21,13 @@ from modules.dynamo import initialize_session
 
 import dms.Intermediary as Intermediary
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 st.session_state.api_key = st.secrets["openai_api_key"]
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -238,8 +245,8 @@ with st.expander(
             image=PROBLEM_IMAGE_PATH,
         )
 
-# 사이드바 튜터 대화 턴(사용자 메시지 수) 확인 후 게이트
-user_turns = sum(1 for m in st.session_state.get("messages_predict", []) if getattr(m, "role", None) == "user")
+# 사이드바 튜터 대화 턴(사용자 메시지 수) 확인
+user_turns = st.session_state.get("phase2_current_turn", 0)
 
 if user_turns < 3:
     st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 아래 정답 입력창이 열립니다.")

@@ -22,6 +22,13 @@ from modules.dynamo import initialize_session
 
 import dms.Intermediary as Intermediary
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 st.session_state.api_key = st.secrets["openai_api_key"]
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -79,6 +86,10 @@ if "phase4_assess_history" not in st.session_state:
 # 대화 턴 추적을 위한 변수 추가
 if "phase4_current_turn" not in st.session_state:
     st.session_state["phase4_current_turn"] = 0
+
+# 제출 횟수 추적을 위한 변수 추가
+if "phase4_submission_count" not in st.session_state:
+    st.session_state["phase4_submission_count"] = 0
 
 def save_draw_image(numpy_array):
     """
@@ -156,17 +167,12 @@ def save_message_to_db(role: str, content: str, content_type: str = "text", llm_
 # Phase 4 페이지 초기화
 initialize_session(phase_num=4)
 
-
-# 세션 UUID 생성 및 초기화 (이미 있다면 재사용)
-if "session_uuid" not in st.session_state:
-    st.session_state["session_uuid"] = str(uuid.uuid4())
-
 # 세션 생성/조회 (페이지 로드 시)
 if st.session_state.get("aws_initialized", False) and st.session_state.get("session_manager"):
     try:
         session_info = st.session_state["session_manager"].get_or_create_session(
-            session_uuid=st.session_state["session_uuid"],
-            user_id="anonymous"  # 필요시 사용자 ID로 변경
+            session_uuid=st.session_state.get("session_uuid"),
+            user_id=st.session_state.get("user_id", "anonymous")
         )
         if session_info:
             st.session_state["session_created"] = True
@@ -461,7 +467,55 @@ with right_col:
             </div>"""
     st.markdown(tooltip_html, unsafe_allow_html=True)
 
-
+# 탭 텍스트 크기 조정 - 더 강력한 선택자 사용
+st.markdown(
+    """
+    <style>
+    /* Streamlit 탭 버튼 - 모든 가능한 선택자 사용 */
+    button[data-baseweb="tab"],
+    button[role="tab"],
+    [data-baseweb="tab"] button,
+    div[data-baseweb="tabs"] button[role="tab"],
+    div[data-baseweb="tabs"] button {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+    }
+    
+    /* 탭 버튼 내부 모든 요소 타겟팅 */
+    button[data-baseweb="tab"] *,
+    button[data-baseweb="tab"] > *,
+    button[data-baseweb="tab"] > div,
+    button[data-baseweb="tab"] span,
+    button[data-baseweb="tab"] p,
+    [data-baseweb="tab"] button *,
+    [data-baseweb="tab"] button > *,
+    div[data-baseweb="tabs"] button *,
+    div[data-baseweb="tabs"] button > * {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    
+    /* 탭 컨테이너 전체 타겟팅 */
+    div[data-baseweb="tabs"],
+    div[data-baseweb="tabs"] button,
+    div[data-baseweb="tabs"] button > div,
+    div[data-baseweb="tabs"] button > span {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    
+    /* Streamlit stTabs 클래스 타겟팅 */
+    .stTabs button,
+    .stTabs button > div,
+    .stTabs [data-baseweb="tab"] {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 tab1, tab2 = st.tabs(['문제 상황', '문제 정답'])
 
 with tab1:
@@ -528,6 +582,9 @@ with tab1:
         st.session_state["explanation_user_reason"] = reason
         st.session_state["explanation_saved_image_path"] = saved_image_path
         st.session_state["explanation_submission_triggered"] = True  # 제출이 트리거되었음을 표시
+
+        # 제출 횟수 증가
+        st.session_state["phase4_submission_count"] = st.session_state.get("phase4_submission_count", 0) + 1
 
         # 새로운 턴 시작 (사용자 답안 제출)
         st.session_state["phase4_current_turn"] += 1
@@ -699,6 +756,21 @@ with st.sidebar:
         user_submit_input = f"(제출한 답변): {st.session_state['explanation_user_reason']}"
         messages.chat_message("user").write(user_submit_input)        
 
+        # 제출 횟수가 5번 이상이면 자동 안내 메시지 표시
+        submission_count = st.session_state.get("phase4_submission_count", 0)
+        if submission_count >= 5:
+            # 자동 안내 메시지
+            guide_message = "메인 화면에 '문제 정답' 탭에서 모범 답안을 확인해보세요."
+            messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write(guide_message)
+
+            add_message("assistant", guide_message)
+            save_message_to_db(
+                role="assistant",
+                content=guide_message,
+                content_type="guide_message",
+                turn=current_turn
+            )
+
         # 비동기 처리를 위한 placeholder
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
@@ -784,8 +856,10 @@ with st.sidebar:
                 # 이미지 파일을 bytesio로 변환후 path 반환 처리
                 image_filepath = process_png_to_bytesio(st.session_state["explanation_saved_image_path"])
 
+                canonical_solution = "행성의 중력으로 인해 인공위성에 작용하는 알짜힘의 방향은 행성의 중심을 향하며, 이 힘은 인공위성의 운동 방향과 수직으로 작용한다. 따라서 인공위성은 속도의 크기는 일정하게 유지되지만 방향이 계속 바뀌며 행성 주위를 도는 등속 원운동을 하게 된다."
+
                 # LLM에 전달될 사용자 프롬프트 생성
-                user_prompt_for_llm = f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}"
+                user_prompt_for_llm = f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n<모범답안>\n{canonical_solution}\n\n---\n\n다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['explanation_user_reason']}"
 
                 # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
                 save_message_to_db(
@@ -861,11 +935,25 @@ with st.sidebar:
         # 새로운 턴 시작 (사용자 질문)
         st.session_state["phase4_current_turn"] += 1
         current_turn = st.session_state["phase4_current_turn"]
-        
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
-            # 사용자의 입력
-            messages.chat_message("user").write(user_input)
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
+
+        # 제출 횟수가 5번 이상이면 자동 안내 메시지 표시
+        submission_count = st.session_state.get("phase4_submission_count", 0)
+        if submission_count >= 5:
+            # 자동 안내 메시지
+            guide_message = "메인 화면에 '문제 정답' 탭에서 모범 답안을 확인해보세요."
+            messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write(guide_message)
+            add_message("assistant", guide_message)
+            save_message_to_db(
+                role="assistant",
+                content=guide_message,
+                content_type="guide_message",
+                turn=current_turn
+            )
+
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             # Intermediary 로직 (Phase 4)
             if st.session_state["phase4_intermediary"] is None:

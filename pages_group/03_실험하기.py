@@ -35,6 +35,13 @@ import dms.Intermediary as Intermediary
 
 set_verbose(False)
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 st.session_state.api_key = st.secrets["openai_api_key"]
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -672,7 +679,7 @@ with col1:
         st.switch_page("pages_group/02_생각하기.py")
 
 # 사이드바 튜터 대화 턴(사용자 메시지 수) 확인
-user_turns = sum(1 for m in st.session_state.get("tutor_messages", []) if getattr(m, "role", None) == "user")
+user_turns = st.session_state.get("phase3_current_turn", 0)
 
 # 3턴 미만일 때 안내 메시지
 if user_turns < 3:

@@ -537,11 +537,12 @@ def initialize_session(phase_num: int):
     # 4. 세션 생성/조회
     session_manager = st.session_state.get("session_manager")
     session_uuid = st.session_state.get("session_uuid")
+    user_id = st.session_state.get("user_id", "anonymous")
     if session_manager and session_uuid:
         try:
             session_info = session_manager.get_or_create_session(
                 session_uuid=session_uuid,
-                user_id="anonymous"
+                user_id=user_id
             )
             if session_info:
                 st.session_state["session_created"] = True

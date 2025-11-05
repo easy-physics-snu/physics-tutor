@@ -6,6 +6,13 @@ from openai import OpenAI
 
 # from langchain_teddynote import logging
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
@@ -84,8 +91,8 @@ st.markdown(
     img[src*="find_tab_guide.png"],
     img[alt*="find_tab_guide"],
     div img[src*="find_tab_guide.png"] {
-        width: 50% !important;
-        max-width: 50% !important;
+        width: 30% !important;
+        max-width: 30% !important;
         height: auto !important;
         max-height: none !important;
         object-fit: contain !important;
@@ -97,6 +104,34 @@ st.markdown(
 
 st.image("src/images/find_tab_guide.png", use_container_width=False)
 
+# 탭 텍스트 크기 조정
+st.markdown(
+    """
+    <style>
+    /* Streamlit 탭 버튼 텍스트 크기 조정 */
+    button[data-baseweb="tab"] {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+    }
+    
+    /* 탭 버튼 내부 텍스트 직접 타겟팅 */
+    button[data-baseweb="tab"] > div,
+    button[data-baseweb="tab"] span {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    
+    /* 탭 컨테이너 전체 타겟팅 (더 넓은 범위) */
+    div[data-baseweb="tabs"] button,
+    div[data-baseweb="tabs"] button > div {
+        font-size: 1.2rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 tab1, tab2 = st.tabs(["1. 여러 가지 운동", "2. 힘과 운동"])
 
 # tab 전환 감지 및 상태 업데이트
@@ -107,7 +142,7 @@ if tab2:
 
 ########### TAB 1 ###########
 with tab1:
-    st.write("**Q1. 놀이공원에서 볼 수 있는 여러 가지 놀이 기구들의 운동 방향과 속력 변화를 표에 정리해봅시다.**")
+    st.write("**Q1. 놀이공원에서 볼 수 있는 여러 가지 놀이 기구들의 운동 방향과 속력 변화를 표에 정리해봅시다.** (한 칸에 1개만 선택해주세요)")
     st.write("([운동 방향]과 [속력] 셀을 클릭하여 알맞은 설명을 골라주세요)")
     
     # 원본 순서 정의 (고정 순서)
@@ -377,7 +412,7 @@ with tab1:
     st.write("")
     st.write("") 
 
-    st.write("**Q2. 놀이 기구의 운동을 다음과 같이 분류해 봅시다.**")
+    st.write("**Q2. 놀이 기구의 운동을 다음과 같이 분류해 봅시다.** (한 칸에 2개가 들어갈 수 있어요)")
     options_1 = st.multiselect(
         "속력만 변하는 운동",
         ["자이로드롭", "회전목마", "롤러코스터", "바이킹"],

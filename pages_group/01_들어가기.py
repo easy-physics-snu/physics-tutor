@@ -6,6 +6,13 @@ from openai import OpenAI
 
 # from langchain_teddynote import logging
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
 os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
@@ -84,8 +91,8 @@ st.markdown(
     img[src*="find_tab_guide.png"],
     img[alt*="find_tab_guide"],
     div img[src*="find_tab_guide.png"] {
-        width: 50% !important;
-        max-width: 50% !important;
+        width: 30% !important;
+        max-width: 30% !important;
         height: auto !important;
         max-height: none !important;
         object-fit: contain !important;
@@ -96,6 +103,34 @@ st.markdown(
 )
 
 st.image("src/images/find_tab_guide.png", use_container_width=False)
+
+# 탭 텍스트 크기 조정
+st.markdown(
+    """
+    <style>
+    /* Streamlit 탭 버튼 텍스트 크기 조정 */
+    button[data-baseweb="tab"] {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+    }
+    
+    /* 탭 버튼 내부 텍스트 직접 타겟팅 */
+    button[data-baseweb="tab"] > div,
+    button[data-baseweb="tab"] span {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    
+    /* 탭 컨테이너 전체 타겟팅 (더 넓은 범위) */
+    div[data-baseweb="tabs"] button,
+    div[data-baseweb="tabs"] button > div {
+        font-size: 1.2rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 tab1, tab2 = st.tabs(["1. 여러 가지 운동", "2. 힘과 운동"])
 

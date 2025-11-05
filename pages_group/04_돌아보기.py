@@ -22,6 +22,13 @@ from modules.dynamo import initialize_session
 
 import dms.Intermediary as Intermediary
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 st.session_state.api_key = st.secrets["openai_api_key"]
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
@@ -156,17 +163,12 @@ def save_message_to_db(role: str, content: str, content_type: str = "text", llm_
 # Phase 4 페이지 초기화
 initialize_session(phase_num=4)
 
-
-# 세션 UUID 생성 및 초기화 (이미 있다면 재사용)
-if "session_uuid" not in st.session_state:
-    st.session_state["session_uuid"] = str(uuid.uuid4())
-
 # 세션 생성/조회 (페이지 로드 시)
 if st.session_state.get("aws_initialized", False) and st.session_state.get("session_manager"):
     try:
         session_info = st.session_state["session_manager"].get_or_create_session(
-            session_uuid=st.session_state["session_uuid"],
-            user_id="anonymous"  # 필요시 사용자 ID로 변경
+            session_uuid=st.session_state.get("session_uuid"),
+            user_id=st.session_state.get("user_id", "anonymous")
         )
         if session_info:
             st.session_state["session_created"] = True
@@ -461,7 +463,55 @@ with right_col:
             </div>"""
     st.markdown(tooltip_html, unsafe_allow_html=True)
 
-
+# 탭 텍스트 크기 조정 - 더 강력한 선택자 사용
+st.markdown(
+    """
+    <style>
+    /* Streamlit 탭 버튼 - 모든 가능한 선택자 사용 */
+    button[data-baseweb="tab"],
+    button[role="tab"],
+    [data-baseweb="tab"] button,
+    div[data-baseweb="tabs"] button[role="tab"],
+    div[data-baseweb="tabs"] button {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+    }
+    
+    /* 탭 버튼 내부 모든 요소 타겟팅 */
+    button[data-baseweb="tab"] *,
+    button[data-baseweb="tab"] > *,
+    button[data-baseweb="tab"] > div,
+    button[data-baseweb="tab"] span,
+    button[data-baseweb="tab"] p,
+    [data-baseweb="tab"] button *,
+    [data-baseweb="tab"] button > *,
+    div[data-baseweb="tabs"] button *,
+    div[data-baseweb="tabs"] button > * {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    
+    /* 탭 컨테이너 전체 타겟팅 */
+    div[data-baseweb="tabs"],
+    div[data-baseweb="tabs"] button,
+    div[data-baseweb="tabs"] button > div,
+    div[data-baseweb="tabs"] button > span {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    
+    /* Streamlit stTabs 클래스 타겟팅 */
+    .stTabs button,
+    .stTabs button > div,
+    .stTabs [data-baseweb="tab"] {
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 tab1, tab2 = st.tabs(['문제 상황', '문제 정답'])
 
 with tab1:

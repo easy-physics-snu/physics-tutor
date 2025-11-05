@@ -14,6 +14,13 @@ import time
 # # from langchain_teddynote import logging
 from openai import OpenAI
 
+# 로그인 상태 확인
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
+    if st.button("메인 페이지로 이동"):
+        st.switch_page("pages_group/00_Main.py")
+    st.stop()
+
 st.session_state.api_key = st.secrets["openai_api_key"]
 
 # 각 사용자별 고유 세션 ID 생성

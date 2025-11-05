@@ -4,7 +4,6 @@ import os
 import base64
 import asyncio
 import json
-import uuid
 
 from PIL import Image
 from datetime import datetime
@@ -616,7 +615,7 @@ with tab1:
         save_message_to_db(
             role="user",
             content=submission_content,
-            content_type="submission",  # 제출 타입으로 표시
+            content_type="canvas_submission",  # 제출 타입으로 표시
             turn=current_turn
         )
 
@@ -756,6 +755,14 @@ with st.sidebar:
         user_submit_input = f"(제출한 답변): {st.session_state['explanation_user_reason']}"
         messages.chat_message("user").write(user_submit_input)        
 
+        # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+        save_message_to_db(
+            role="user",
+            content=user_submit_input,
+            content_type="reason_submission",
+            turn=current_turn
+        )
+
         # 제출 횟수가 5번 이상이면 자동 안내 메시지 표시
         submission_count = st.session_state.get("phase4_submission_count", 0)
         if submission_count >= 5:
@@ -832,7 +839,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Assessment]\n{assessment_formatted}",
-                    content_type="intermediary_assessment",
+                    content_type="intent_assess",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -843,7 +850,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
-                    content_type="intermediary_acts",
+                    content_type="dialog_acts",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -896,17 +903,10 @@ with st.sidebar:
                     add_message("user", f"(제출한 답변): {st.session_state['explanation_user_reason']}")
                     add_message("assistant", ai_feedback)
 
-                    # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
-                    save_message_to_db(
-                        role="user",
-                        content=user_submit_input,
-                        content_type="submission",
-                        turn=current_turn
-                    )
                     save_message_to_db(
                         role="assistant",
                         content=ai_feedback,
-                        content_type="feedback",
+                        content_type="ai_feedback",
                         llm_model=selected_model,
                         turn=current_turn
                     )
@@ -930,14 +930,21 @@ with st.sidebar:
 
     # 만약에 사용자 입력이 들어오면...
     if user_input:
-        # 비동기 처리
-        
+
         # 새로운 턴 시작 (사용자 질문)
         st.session_state["phase4_current_turn"] += 1
         current_turn = st.session_state["phase4_current_turn"]
 
         # 사용자의 입력
         messages.chat_message("user").write(user_input)
+
+        # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+        save_message_to_db(
+            role="user",
+            content=user_input,
+            content_type="user_query",
+            turn=current_turn
+        )
 
         # 제출 횟수가 5번 이상이면 자동 안내 메시지 표시
         submission_count = st.session_state.get("phase4_submission_count", 0)
@@ -1012,7 +1019,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Assessment]\n{assessment_formatted}",
-                    content_type="intermediary_assessment",
+                    content_type="intent_assess",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -1023,7 +1030,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
-                    content_type="intermediary_acts",
+                    content_type="dialog_acts",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -1076,17 +1083,10 @@ with st.sidebar:
                     add_message("user", user_input)
                     add_message("assistant", ai_answer)
                     
-                    # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
-                    save_message_to_db(
-                        role="user",
-                        content=user_input,
-                        content_type="text",
-                        turn=current_turn
-                    )
                     save_message_to_db(
                         role="assistant",
                         content=ai_answer,
-                        content_type="text",
+                        content_type="ai_answer",
                         llm_model=selected_model,
                         turn=current_turn
                     )

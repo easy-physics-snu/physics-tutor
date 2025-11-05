@@ -2,7 +2,6 @@ import re
 import os
 import io
 import time
-import sys
 import base64
 import uuid
 import json
@@ -532,10 +531,18 @@ with st.sidebar:
         st.session_state["phase3_current_turn"] += 1
         current_turn = st.session_state["phase3_current_turn"]
 
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+        # 사용자의 입력
+        messages.chat_message("user").write(user_input)
 
-            # 사용자의 입력
-            messages.chat_message("user").write(user_input)
+        # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+        save_message_to_db(
+            role="user",
+            content=user_input,
+            content_type="user_query",
+            turn=current_turn
+        )
+
+        with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             if st.session_state["phase3_intermediary"] is None:
                 intermediary = Intermediary.Intermediary(
@@ -602,7 +609,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Assessment]\n{assessment_formatted}",
-                    content_type="intermediary_assessment",
+                    content_type="intent_assess",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -613,7 +620,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
-                    content_type="intermediary_acts",
+                    content_type="dialog_acts",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -650,17 +657,10 @@ with st.sidebar:
             add_message("user", user_input)
             add_message("assistant", ai_answer)
             
-            # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
-            save_message_to_db(
-                role="user",
-                content=user_input,
-                content_type="text",
-                turn=current_turn
-            )
             save_message_to_db(
                 role="assistant",
                 content=ai_answer,
-                content_type="text",
+                content_type="ai_answer",
                 llm_model=selected_model,
                 turn=current_turn
             )

@@ -1,7 +1,6 @@
 import os
 import asyncio
 import streamlit as st
-import uuid
 import json
 
 from PIL import Image
@@ -345,7 +344,7 @@ if st.session_state.get("show_predict_input", False):
         save_message_to_db(
             role="user",
             content=submission_content,
-            content_type="submission",  # 제출 타입으로 표시
+            content_type="canvas_submission",  # 제출 타입으로 표시
             turn=current_turn
         )
 
@@ -442,6 +441,14 @@ with st.sidebar:
         user_submit_input = f"(제출한 답변): {st.session_state['predict_user_reason']}"
         messages.chat_message("user").write(user_submit_input)
 
+        # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+        save_message_to_db(
+            role="user",
+            content=user_submit_input,
+            content_type="reason_submission",
+            turn=current_turn
+        )
+
         # 비동기 처리를 위한 placeholder
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
@@ -490,7 +497,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Assessment]\n{assessment_formatted}",
-                    content_type="intermediary_assessment",
+                    content_type="intent_assess",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -501,7 +508,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
-                    content_type="intermediary_acts",
+                    content_type="dialog_acts",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -552,17 +559,10 @@ with st.sidebar:
                     add_message("user", f"(제출한 답변): {st.session_state['predict_user_reason']}")
                     add_message("assistant", ai_feedback)
 
-                    # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
-                    save_message_to_db(
-                        role="user",
-                        content=user_submit_input,
-                        content_type="submission",
-                        turn=current_turn
-                    )
                     save_message_to_db(
                         role="assistant",
                         content=ai_feedback,
-                        content_type="feedback",
+                        content_type="ai_feedback",
                         llm_model=selected_model,
                         turn=current_turn
                     )
@@ -604,6 +604,14 @@ with st.sidebar:
         st.session_state["phase2_current_turn"] += 1
         current_turn = st.session_state["phase2_current_turn"]
         
+        # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
+        save_message_to_db(
+            role="user",
+            content=user_input,
+            content_type="user_query",
+            turn=current_turn
+        )
+
         with st.spinner("AI가 답변을 생성하고 있습니다..."):
 
             # 사용자의 입력
@@ -653,7 +661,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Assessment]\n{assessment_formatted}",
-                    content_type="intermediary_assessment",
+                    content_type="intent_assess",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -664,7 +672,7 @@ with st.sidebar:
                 save_message_to_db(
                     role="assistant",
                     content=f"[Intermediary Acts]\n{json.dumps(acts_serializable, ensure_ascii=False, indent=2)}",
-                    content_type="intermediary_acts",
+                    content_type="dialog_acts",
                     llm_model=INQUIRY_ASSISTANT_OPENAI_MODEL,
                     turn=current_turn
                 )
@@ -686,12 +694,13 @@ with st.sidebar:
 
             try:
                 # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
-                image_source_path = (
-                    st.session_state.get("predict_saved_image_path")
-                    or CANVAS_IMAGE_PATH
-                )
-                # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
-                image_filepath = process_png_to_bytesio(image_source_path)
+                # image_source_path = (
+                #     st.session_state.get("predict_saved_image_path")
+                #     or CANVAS_IMAGE_PATH
+                # )
+                # # 이미지 파일을 처리: 첫 턴과 동일하게 항상 이미지 포함
+                # image_filepath = process_png_to_bytesio(image_source_path)
+                image_filepath = None
 
                 # LLM에 전달될 사용자 프롬프트 생성
                 user_prompt_for_llm = prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input
@@ -729,17 +738,10 @@ with st.sidebar:
                     add_message("user", user_input)
                     add_message("assistant", ai_answer)
                     
-                    # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
-                    save_message_to_db(
-                        role="user",
-                        content=user_input,
-                        content_type="text",
-                        turn=current_turn
-                    )
                     save_message_to_db(
                         role="assistant",
                         content=ai_answer,
-                        content_type="text",
+                        content_type="ai_answer",
                         llm_model=selected_model,
                         turn=current_turn
                     )

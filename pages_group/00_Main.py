@@ -23,6 +23,9 @@ if not os.path.exists(".cache/embeddings"):
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
+if "user_id" not in st.session_state:
+    st.session_state["user_id"] = None
+
 if "session_uuid" not in st.session_state:
     st.session_state["session_uuid"] = None
 

@@ -630,13 +630,14 @@ def process_answer(user_input):
     if score >= 80:
         # 정답! 완료 메시지
         stars = "⭐⭐⭐⭐⭐"
-        completion_msg = f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. 모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
+        completion_msg = f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. "
         
         # missing_contents가 실제로 있는 경우만 표시
         missing_clean = missing.strip().strip("[]").strip()
         if missing_clean and missing_clean.lower() not in ["없음", "none", ""]:
-            completion_msg += f"\n\n지금 답변에서 [{missing_clean}] 도 고려하면 더 완벽한 답변이 될 거예요."
+            completion_msg += f"지금 답변에 [{missing_clean}] 도 포함시키면 더 완벽한 답변이 될 거예요."
         
+        completion_msg+= f"\n\n모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
         completion_msg += "\n\n**메인 화면의 답변 작성란에 최종 답안을 다시 작성해보세요!**"
         
         add_message_to_history("assistant", completion_msg)
@@ -743,7 +744,28 @@ if st.session_state.get("show_resources", False):
 
         with tab1:
             st.write("⏬ 아래 기사를 참고해보세요 ⏬ (기사 제목 클릭)")
-            st.page_link(page="https://blog.hyundai-rotem.co.kr/671", label="<철도에 사용되는 과학기술: 고속 주행에도 안전한 커브는 OOO덕분?!>")
+            st.markdown(
+                """
+                <style>
+                .article-link {
+                    font-size: 1.5em;
+                    font-weight: bold;
+                }
+                .article-link a {
+                    text-decoration: underline;
+                    color: #0066cc;
+                }
+                .article-link a:hover {
+                    text-decoration: underline;
+                    color: #004499;
+                }
+                </style>
+                <div class="article-link">
+                    <a href="https://blog.hyundai-rotem.co.kr/671" target="_blank">철도에 사용되는 과학기술: 고속 주행에도 안전한 커브는 OOO덕분?!</a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             st.image("https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdna%2Fc4OysX%2FbtruRMLUUsC%2FAAAAAAAAAAAAAAAAAAAAAJfF5rx9v7vc9kbmx8Ez9-eVnTSHIXqTV7EEN-OPyi4r%2Fimg.jpg%3Fcredential%3DyqXZFxpELC7KVnFOS48ylbz2pIh7yKj8%26expires%3D1759244399%26allow_ip%3D%26allow_referer%3D%26signature%3DufVaE0921PMCrw57Gpu%252FanjcQZs%253D")
 
         with tab2:
@@ -756,9 +778,12 @@ if st.session_state.get("show_resources", False):
 #####################################
 with st.sidebar:
     st.write("**AI 선생님**의 피드백")
+    
     messages = st.container(height=400)
+    st.write("답안은 완전한 문장 형태로 작성해주세요:)")
     status_container = st.empty()
     ai_info = st.empty()
+    
 
     # 초기 메시지 추가 (한 번만)
     if len(st.session_state.chat_history_applying) == 0:

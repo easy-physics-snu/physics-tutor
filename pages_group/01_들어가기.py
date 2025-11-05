@@ -142,7 +142,7 @@ if tab2:
 
 ########### TAB 1 ###########
 with tab1:
-    st.write("**Q1. 놀이공원에서 볼 수 있는 여러 가지 놀이 기구들의 운동 방향과 속력 변화를 표에 정리해봅시다.**")
+    st.write("**Q1. 놀이공원에서 볼 수 있는 여러 가지 놀이 기구들의 운동 방향과 속력 변화를 표에 정리해봅시다.** (한 칸에 1개만 선택해주세요)")
     st.write("([운동 방향]과 [속력] 셀을 클릭하여 알맞은 설명을 골라주세요)")
     
     # 원본 순서 정의 (고정 순서)
@@ -412,7 +412,7 @@ with tab1:
     st.write("")
     st.write("") 
 
-    st.write("**Q2. 놀이 기구의 운동을 다음과 같이 분류해 봅시다.**")
+    st.write("**Q2. 놀이 기구의 운동을 다음과 같이 분류해 봅시다.** (한 칸에 2개가 들어갈 수 있어요)")
     options_1 = st.multiselect(
         "속력만 변하는 운동",
         ["자이로드롭", "회전목마", "롤러코스터", "바이킹"],
@@ -435,24 +435,40 @@ with tab1:
         "속력과 운동 방향이 모두 변하는 운동": ["롤러코스터", "바이킹"]
     }
     
-    if options_1 and options_2 and options_3:
+    # 4개의 선택지가 모두 배정되었는지 확인
+    all_rides = ["자이로드롭", "회전목마", "롤러코스터", "바이킹"]
+    selected_rides = list(options_1) + list(options_2) + list(options_3)
+    all_rides_assigned = set(selected_rides) == set(all_rides) and len(selected_rides) == 4
+    
+    if all_rides_assigned:
         is_correct = True
-        wrong_categories = []
+        wrong_rides = set()  # 잘못 분류된 놀이기구 목록
         
         # 속력만 변하는 운동 체크
         if sorted(options_1) != sorted(correct_q2["속력만 변하는 운동"]):
             is_correct = False
-            wrong_categories.append(f"**속력만 변하는 운동**: {options_1 if options_1 else '선택 없음'} (정답: {correct_q2['속력만 변하는 운동']})")
+            # 잘못 선택된 항목 (정답이 아닌 것)
+            wrong_selected = set(options_1) - set(correct_q2["속력만 변하는 운동"])
+            # 누락된 항목 (정답인데 선택되지 않은 것)
+            missing = set(correct_q2["속력만 변하는 운동"]) - set(options_1)
+            wrong_rides.update(wrong_selected)
+            wrong_rides.update(missing)
         
         # 운동 방향만 변하는 운동 체크
         if sorted(options_2) != sorted(correct_q2["운동 방향만 변하는 운동"]):
             is_correct = False
-            wrong_categories.append(f"**운동 방향만 변하는 운동**: {options_2 if options_2 else '선택 없음'} (정답: {correct_q2['운동 방향만 변하는 운동']})")
+            wrong_selected = set(options_2) - set(correct_q2["운동 방향만 변하는 운동"])
+            missing = set(correct_q2["운동 방향만 변하는 운동"]) - set(options_2)
+            wrong_rides.update(wrong_selected)
+            wrong_rides.update(missing)
         
         # 속력과 운동 방향이 모두 변하는 운동 체크
         if sorted(options_3) != sorted(correct_q2["속력과 운동 방향이 모두 변하는 운동"]):
             is_correct = False
-            wrong_categories.append(f"**속력과 운동 방향이 모두 변하는 운동**: {options_3 if options_3 else '선택 없음'} (정답: {correct_q2['속력과 운동 방향이 모두 변하는 운동']})")
+            wrong_selected = set(options_3) - set(correct_q2["속력과 운동 방향이 모두 변하는 운동"])
+            missing = set(correct_q2["속력과 운동 방향이 모두 변하는 운동"]) - set(options_3)
+            wrong_rides.update(wrong_selected)
+            wrong_rides.update(missing)
         
         if is_correct:
                     st.session_state.q2 = True
@@ -464,23 +480,37 @@ with tab1:
             if st.session_state.q2:
                 info_q2.success("정답입니다!")
             else:
-                error_msg = "다음 분류를 확인해주세요:\n\n"
-                for category in wrong_categories:
-                    error_msg += f"- {category}\n"
+                # for category in wrong_categories:
+                #     error_msg += f"- {category}\n"
+                # if wrong_rides:
+                error_msg = f"다음 놀이기구의 운동을 다시 분류해주세요🔍: {', '.join(sorted(wrong_rides))}"
+                # else:
+                #     error_msg = "다음 놀이기구의 운동을 다시 분류해주세요🔍"
                 info_q2.error(error_msg)
+
     else:
-        # 모든 항목이 선택되지 않은 경우
-        missing = []
-        if not options_1:
-            missing.append("속력만 변하는 운동")
-        if not options_2:
-            missing.append("운동 방향만 변하는 운동")
-        if not options_3:
-            missing.append("속력과 운동 방향이 모두 변하는 운동")
-        if missing:
-            info_q2.warning(f"다음 항목을 선택해주세요: {', '.join(missing)}")
-        elif st.session_state.q2:
+        # 4개 선택지가 모두 배정되지 않은 경우
+        if st.session_state.q2:
             info_q2.success("정답입니다!")
+        else:
+            missing_rides = set(all_rides) - set(selected_rides)
+            if missing_rides:
+                info_q2.warning(f"모든 놀이 기구를 분류해주세요. 아직 고르지 않은 항목: {', '.join(sorted(missing_rides))}")
+            else:
+                # 중복 선택이 있는 경우
+                if len(selected_rides) > len(set(selected_rides)):
+                    info_q2.warning("각 놀이 기구는 하나의 분류에만 속해야 합니다. 하나의 놀이기구가 여러 군데에 들어가지 않도록 해주세요")
+                else:
+                    # 카테고리가 비어있는 경우
+                    missing = []
+                    if not options_1:
+                        missing.append("속력만 변하는 운동")
+                    if not options_2:
+                        missing.append("운동 방향만 변하는 운동")
+                    if not options_3:
+                        missing.append("속력과 운동 방향이 모두 변하는 운동")
+                    if missing:
+                        info_q2.warning(f"다음 항목을 선택해주세요: {', '.join(missing)}")
 
     if st.session_state.q1 and st.session_state.q2:
         st.subheader("**핵심 정리!**")
@@ -537,9 +567,9 @@ with tab2:
                 "물체에 알짜힘이 작용하지 않으면 정지 또는 등속도 운동을 한다",
                 "물체에 알짜힘이 없을 때 운동상태는 정지 또는 등속도 운동이다"
             ],
-            'correct_feedback': "정말 잘 설명했어요!  \n\n뉴턴 제1법칙은 '관성의 법칙'이라고도 불러요. 물체가 현재 상태를 유지하려는 성질을 '관성'이라고 하죠.",
+            'correct_feedback': "정말 잘 설명했어요!  \n\n뉴턴 제1법칙은 '관성 법칙'이라고도 불러요. 물체가 현재 상태를 유지하려는 성질을 '관성'이라고 하죠.",
             'hint': "알짜힘이 0일 때 물체는 어떻게 될까요? 물체의 운동 상태가 어떻게 변할지(또는 변하지 않을지) 생각해보세요.",
-            'evaluation_note': "** 중요 평가 지침: '운동 상태'라는 키워드 자체는 필수가 아닙니다. 대신 '정지', '등속도', '등속 직선 운동' 같은 구체적인 운동 상태를 설명하면 정답으로 인정합니다."
+            'evaluation_note': "** 중요 평가 지침: '운동 상태'라는 키워드 자체는 필수가 아닙니다. 대신 '정지', '등속도', '등속 직선 운동' 같은 구체적인 운동 상태를 설명하면 정답으로 인정합니다. 또한 뉴턴 제1법칙은 '관성 법칙', '관성의 법칙' 등으로도 불립니다."
         },
         'Q3': {
             'question': "마지막으로 뉴턴 운동 제2법칙입니다! \n\n**다음 키워드를 참고하여 뉴턴 운동 제2법칙을 설명해주세요:**\n[물체, 알짜힘, 가속도, 질량]",
@@ -549,18 +579,18 @@ with tab2:
                 "물체에 작용하는 알짜힘은 가속도와 물체의 질량에 비례한다",
                 "물체에 작용하는 알짜힘은 가속도에 비례하고 질량에 비례한다",
                 "물체의 가속도는 작용하는 알짜힘에 비례하고 질량에 반비례한다",
+                "가속도는 질량이 클수록, 알짜힘이 작을수록 작다",
                 "물체에 작용하는 알짜힘은 물체를 가속시키며, 그 크기는 질량과 가속도의 곱으로 나타낼 수 있다",
                 "물체의 가속도는 알짜힘에 비례하고 질량에 반비례한다. 즉, 힘이 크면 가속도도 커지고, 질량이 크면 가속도는 작아진다",
                 "물체에 알짜힘이 작용하면, 물체는 질량에 반비례하는 크기의 가속도를 얻는다",
                 "물체의 운동 상태가 변하는 정도, 즉 가속도는 알짜힘의 크기에 비례하고, 물체의 질량에 따라 그 크기가 달라진다",
                 "물체의 속도가 변하는 정도, 즉 가속도는 알짜힘의 크기에 비례하고 물체의 질량에 반비례한다"
             ],
-            'correct_feedback': "잘했습니다!  \n\n수식으로 표현하면 F = ma가 되죠. 같은 힘을 작용해도 질량이 큰 물체는 작은 가속도로, 질량이 작은 물체는 큰 가속도로 운동하게 됩니다.",
+            'correct_feedback': "잘했습니다!  \n\n수식으로 표현하면 F = ma가 되죠. 뉴턴 제2법칙의 핵심은 '가속도가 어떻게 결정되는가'입니다. 같은 힘을 작용해도 질량이 큰 물체는 작은 가속도로, 질량이 작은 물체는 큰 가속도로 운동하게 됩니다.",
             'hint': "알짜힘과 가속도는 어떤 관계가 있을까요? 그리고 질량이 커지면 가속도는 어떻게 될까요? 이 관계를 모두 포함해서 설명해보세요.",
             'evaluation_note': """** 중요 평가 지침: 
 1. '물체'라는 키워드 자체는 필수가 아닙니다.
-2. 뉴턴 제2법칙의 핵심은 '가속도가 어떻게 결정되는가'입니다.
-3. "알짜힘은 가속도와 질량에 비례한다" 또는 "F=ma"는 수식적으로는 맞지만, 가속도를 주어로 설명하지 않았습니다.
+2. "알짜힘은 가속도와 질량에 비례한다" 또는 "F=ma"는 수식적으로는 맞지만, 가속도를 주어로 설명하지 않았습니다.
    → 이 경우 "부분적으로 맞지만 불완전하다"고 판정하고, "F=ma를 잘 설명했네요! 그런데 뉴턴 제2법칙은 가속도가 어떻게 결정되는지를 설명하는 법칙이에요. 가속도 입장에서 다시 생각해볼까요?"와 같이 피드백하세요."""
         },
         'End': {
@@ -590,7 +620,7 @@ with tab2:
             evaluation_note = current_q.get('evaluation_note', '')
             evaluation_note_section = f"\n\n{evaluation_note}" if evaluation_note else ""
             
-            prompt = f"""당신은 물리 교육 평가 전문가입니다. 학생의 답변이 정답으로 인정될 수 있는지 평가해주세요.
+            prompt = f"""당신은 물리 교육 평가 전문가입니다. 학생의 답변을 평가해주세요.
 
 문제: {current_q['question']}
 
@@ -598,6 +628,28 @@ with tab2:
 {correct_answers_text}{hint_section}{evaluation_note_section}
 
 학생 답변: {user_answer}
+
+**⚠️ 평가 전 필수 체크 (가장 우선!):**
+
+**1단계: 질문인지 답변 시도인지 먼저 판단**
+- 질문의 본질: 학생이 "무엇인지 모르겠으니 설명해달라"는 의도
+- 질문 지표: "뭐예요?", "뭐야?", "정의", "의미", "알려주세요", "설명해주세요", "차이는?" 등
+- 내용: 문제에 대한 답변이 아니라, 개념/용어 자체에 대한 질문
+
+**만약 질문이라면:**
+- 판정: 오답 (문제 풀이가 아니므로)
+- 피드백: **학생이 물어본 질문에 직접 답변하세요**. 학생이 물어본 내용을 정확히 설명하고, 맥락에 따라 자연스럽게 문제로 연결할 수도 있습니다.
+
+**질문 처리 원칙:**
+1. ✅ **대부분의 질문은 직접 답변**: 물리 개념, 용어, 원리, 관계에 대한 질문은 모두 직접 설명
+   - 예시: "알짜힘이 뭐예요?" → 직접 답변: "알짜힘은 물체에 작용하는 모든 힘을 합친 것이에요. 줄다리기에서 양쪽 힘을 모두 고려한 최종 힘이 바로 알짜힘이죠."
+   - 예시: "관성이 뭐예요?" → 직접 답변: "관성은 물체가 현재 운동 상태를 유지하려는 성질이에요. 정지한 물체는 계속 정지하려 하고, 움직이는 물체는 계속 움직이려 하죠."
+   - **예시에 없는 질문이 나오면**: 학생의 의도를 파악하고, 물리적 지식을 활용하여 맥락에 맞게 답변해주세요. 질문을 피하거나 다른 내용을 설명하지 마세요.
+2. ⚠️ **주의**: 문제의 직접적인 정답은 말하지 마세요. 정답 발문이 아니면, 개념은 설명해도 됩니다.
+3. 설명 후 학생이 직접 문제에 적용해보도록 자연스럽게 유도하세요.
+
+**만약 답변 시도라면:**
+- 아래 평가 기준에 따라 점수와 피드백 제공
 
 평가 기준:
 1. 학생 답변이 물리적으로 올바른 개념을 포함하는가?
@@ -636,13 +688,12 @@ with tab2:
 - 무의미한 글자("ㄴ내내낸", "ㅁㄴㅇㄹ") → 답변을 이해 못했다고 하고 다시 유도
   예) "답변을 잘 이해하지 못했어요. 🤔 다시 한번 생각해볼까요? 여러 힘을 하나로 합친 것은 무엇일까요?"
 
-**핵심 원칙: 어떤 답변이든 부정적 평가 없이 긍정적으로 받아들이고, 자연스럽게 문제로 유도하세요.**
-판정은 "오답"으로 처리.
+**핵심 원칙: 어떤 답변이든 부정적 평가 없이 긍정적으로 받아들이고, 학생이 질문을 한다면 그에 맞는 대답을 한 후 자연스럽게 문제로 유도하세요.**
 
 다음 형식으로만 답변해주세요:
 판정: [정답/오답]
 피드백: [세 문장 이내로 작성]"""
-            
+
             response = client.chat.completions.create(
                 model=TUTOR_OPENAI_MODEL,
                 messages=[
@@ -706,12 +757,12 @@ with tab2:
         # AI 응답 생성 중 상태 표시
         with status_container:
             st.info("🤔 AI가 답변을 생성중입니다...")
-        
+            
         # LLM을 사용한 답변 평가 (정오답 판정 + 피드백을 한 번에 받음)
         is_correct, ai_feedback = evaluate_answer_with_llm(user_input, st.session_state.current_question)
         
         if is_correct:
-            # 정답인 경우 - 미리 정의된 상세한 피드백 사용
+        # 정답인 경우 - 미리 정의된 상세한 피드백 사용
             feedback = current_q['correct_feedback']
             
             # 정답일 때 이미지와 함께 피드백 추가

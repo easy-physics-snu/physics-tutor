@@ -1,17 +1,14 @@
 # by Romain Puech
 # 한국어 버전으로 수정 - Korean Version By Junbo Koh
 
-from dms.prompts.IntentTaxonomy import DEFAULT_ASSESS_PROMPT, PHASE2_ASSESS_PROMPT, PHASE3_ASSESS_PROMPT, PHASE4_ASSESS_PROMPT
 import json
 
-class IntentAssessor():
-   """Student State Assessor - 학생의 발화를 분석하여 학습 상태를 평가"""
-   PHASE_PROMPTS = {
-      2: PHASE2_ASSESS_PROMPT,
-      3: PHASE3_ASSESS_PROMPT,
-      4: PHASE4_ASSESS_PROMPT,
-    }
+from i18n import ai_language_instruction, lt
+from i18n.prompt_loader import load_localized_values
+import dms.prompts.IntentTaxonomy as intent_taxonomy
 
+class IntentAssessor():
+   lt("""Student State Assessor - 학생의 발화를 분석하여 학습 상태를 평가""", """Student State Assessor - Analyzes the student's utterances to evaluate their learning state""")
    def __init__(self, client, model, phase, assessment_history=[]) -> None:
       self.client = client
       self.model = model
@@ -19,20 +16,32 @@ class IntentAssessor():
       self.assess_history = list(assessment_history)
 
    def get_phase_criteria(self):
-      """현재 phase에 해당하는 평가 기준을 반환"""
-      return self.PHASE_PROMPTS.get(self.phase, DEFAULT_ASSESS_PROMPT)  # 기본값으로 DEFAULT_ASSESS_PROMPT 사용
+      lt("""현재 phase에 해당하는 평가 기준을 반환""", """Returns the assessment criteria for the current phase""")
+      default_prompt, phase2_prompt, phase3_prompt, phase4_prompt = load_localized_values(
+         intent_taxonomy,
+         "DEFAULT_ASSESS_PROMPT",
+         "PHASE2_ASSESS_PROMPT",
+         "PHASE3_ASSESS_PROMPT",
+         "PHASE4_ASSESS_PROMPT",
+      )
+      phase_prompts = {
+         2: phase2_prompt,
+         3: phase3_prompt,
+         4: phase4_prompt,
+      }
+      return phase_prompts.get(self.phase, default_prompt)
 
    def get_purpose(self, conversation_history, student_prompt):
       phase_criteria = self.get_phase_criteria()
 
       purpose = \
-      f"""학생이 물리학 역학 단원에서 원운동 문제에 대한 탐구 학습을 수행하고 있습니다.
+      lt(f"""학생이 물리학 역학 단원에서 원운동 문제에 대한 탐구 학습을 수행하고 있습니다.
 
 다음은 학생과 교육 에이전트 간의 대화 기록입니다:
 {conversation_history}
 
 학생의 최신 프롬프트:
-"{student_prompt}"      
+"{student_prompt}"
 
 위 학생의 발화를 분석하여 다음 항목 "a,b,c,d,e,f,g,h,i,j,k,l,m" 중 가장 해당 가능성이 높은 상위 2개의 학습 상태 지표를 선택하세요:
 
@@ -53,11 +62,38 @@ class IntentAssessor():
 ##
 Exactly follow JSON format.
 Analyze the last student's utterance.
-{{"""
-      return purpose
+{{""", f"""A student is conducting inquiry-based learning on circular motion problems in a physics mechanics unit.
+
+The following is the conversation history between the student and the educational agent:
+{conversation_history}
+
+The student's latest prompt:
+"{student_prompt}"
+
+Analyze the student's utterance above and select the top 2 most likely learning state indicators from the following items "a,b,c,d,e,f,g,h,i,j,k,l,m":
+
+{phase_criteria}
+
+Analyze step by step:
+1. Identify the main intent and characteristics of the student's prompt
+2. Evaluate whether each indicator applies
+3. Briefly explain the selected items
+
+**IMPORTANT**: You must respond in the following JSON format:
+##
+{{
+    "justification": "Reasoning behind the analysis of the student's prompt and the rationale for the selected indicators",
+    "selection": "Selected letters separated by commas (e.g., a,c)",
+
+}}
+##
+Exactly follow JSON format.
+Analyze the last student's utterance.
+{{""")
+      return purpose + ai_language_instruction()
 
    def create_prompt(self, conversation_history, student_prompt):
-      """프롬프트 생성 - 대화 기록과 함께 평가 요청"""
+      lt("""프롬프트 생성 - 대화 기록과 함께 평가 요청""", """Creates a prompt — requests assessment along with conversation history""")
       purpose = self.get_purpose(conversation_history, student_prompt)
       prompt = [
          {"role": "system", "content": "You are an expert educational assessor specializing in analyzing students' learning behaviors when using AI agent for physics learning."},
@@ -84,7 +120,7 @@ Analyze the last student's utterance.
       # postprocess make sure the format is right
       s = response.find('{')
       e = response.rfind('}')
-      
+
       # Error handling: Check if braces are found
       if s == -1 or e == -1 or s >= e:
           # Log the raw response for debugging
@@ -95,7 +131,7 @@ Analyze the last student's utterance.
               f"LLM response does not contain valid JSON. "
               f"Expected JSON object but got: {completion.choices[0].message.content[:200]}"
           )
-      
+
       response = response[s:e+1]
 
       try:
@@ -119,6 +155,5 @@ Analyze the last student's utterance.
       # total_tokens = completion.usage.total_tokens
       # prompt_tokens = completion.usage.prompt_tokens
       # completion_tokens = completion.usage.completion_tokens
-      
+
       return assessment
-    

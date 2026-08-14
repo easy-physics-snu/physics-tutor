@@ -9,6 +9,8 @@ from typing import Optional, Dict, List
 from decimal import Decimal
 import streamlit as st
 
+from i18n import get_locale, lt
+
 class DynamoDBManager:
     """DynamoDB 관리 클래스"""
     
@@ -236,13 +238,13 @@ class S3Manager:
             return object_name
             
         except FileNotFoundError:
-            st.error(f"이미지 파일을 찾을 수 없습니다: {file_path}")
+            st.error(lt(f"이미지 파일을 찾을 수 없습니다: {file_path}", f"Image file not found: {file_path}"))
             return None
         except NoCredentialsError:
-            st.error("AWS 자격 증명을 찾을 수 없습니다.")
+            st.error(lt("AWS 자격 증명을 찾을 수 없습니다.", "AWS credentials not found."))
             return None
         except Exception as e:
-            st.error(f"S3 이미지 업로드 오류: {e}")
+            st.error(lt(f"S3 이미지 업로드 오류: {e}", f"S3 image upload error: {e}"))
             traceback.print_exc()
             return None
 
@@ -260,13 +262,19 @@ class SessionManager:
         self.dynamo_manager = dynamo_manager
         self.session_table = dynamo_manager.get_session_table()
     
-    def get_or_create_session(self, session_uuid: str, user_id: Optional[str] = None) -> Optional[Dict]:
+    def get_or_create_session(
+        self,
+        session_uuid: str,
+        user_id: Optional[str] = None,
+        locale: Optional[str] = None,
+    ) -> Optional[Dict]:
         """
         세션 생성 또는 조회
         
         Args:
             session_uuid: 세션 UUID
             user_id: 사용자 ID
+            locale: UI/AI 언어 코드 (en/ko)
         
         Returns:
             dict: 세션 정보 또는 None (실패 시)
@@ -282,12 +290,13 @@ class SessionManager:
                 session_item = {
                     'session_uuid': session_uuid,
                     'user_id': user_id or 'anonymous',
+                    'locale': locale or get_locale(),
                     'created_at': self._datetime_to_timestamp(now)
                 }
                 self.session_table.put_item(Item=session_item)
                 return session_item
         except Exception as e:
-            st.error(f"세션 생성/조회 오류: {e}")
+            st.error(lt(f"세션 생성/조회 오류: {e}", f"Session creation/lookup error: {e}"))
             return None
     
     def get_session(self, session_uuid: str) -> Optional[Dict]:
@@ -308,7 +317,7 @@ class SessionManager:
             else:
                 return None
         except Exception as e:
-            st.error(f"세션 조회 오류: {e}")
+            st.error(lt(f"세션 조회 오류: {e}", f"Session lookup error: {e}"))
             return None
     
     def _datetime_to_timestamp(self, dt: datetime) -> Decimal:
@@ -362,7 +371,7 @@ class PhaseManager:
                 })
             return messages
         except Exception as e:
-            st.error(f"Phase {self.phase_num} 메시지 로드 오류: {e}")
+            st.error(lt(f"Phase {self.phase_num} 메시지 로드 오류: {e}", f"Phase {self.phase_num} message load error: {e}"))
             return []
     
     def save_phase_message(self, session_id: str, role: str, content_type: str, 
@@ -410,7 +419,7 @@ class PhaseManager:
             self.phase_table.put_item(Item=message_item)
             return True
         except Exception as e:
-            st.error(f"Phase {self.phase_num} 메시지 저장 오류: {e}")
+            st.error(lt(f"Phase {self.phase_num} 메시지 저장 오류: {e}", f"Phase {self.phase_num} message save error: {e}"))
             traceback.print_exc()
             return False
     
@@ -475,7 +484,7 @@ def initialize_aws_services():
         st.session_state["aws_initialized"] = True
         return True
     except Exception as e:
-        st.warning(f"AWS 연결 초기화 실패: {e}")
+        st.warning(lt(f"AWS 연결 초기화 실패: {e}", f"AWS connection initialization failed: {e}"))
         st.session_state["aws_initialized"] = False
         st.session_state["dynamo_manager"] = None
         st.session_state["s3_manager"] = None
@@ -513,7 +522,7 @@ def ensure_phase_manager(phase_num: int) -> Optional[PhaseManager]:
         st.session_state[manager_key] = phase_manager
         return phase_manager
     except Exception as e:
-        st.warning(f"Phase {phase_num} 매니저 초기화 실패: {e}")
+        st.warning(lt(f"Phase {phase_num} 매니저 초기화 실패: {e}", f"Phase {phase_num} manager initialization failed: {e}"))
         return None
 
 
@@ -542,9 +551,10 @@ def initialize_session(phase_num: int):
         try:
             session_info = session_manager.get_or_create_session(
                 session_uuid=session_uuid,
-                user_id=user_id
+                user_id=user_id,
+                locale=get_locale(),
             )
             if session_info:
                 st.session_state["session_created"] = True
         except Exception as e:
-            st.warning(f"세션 생성/조회 실패: {e}")
+            st.warning(lt(f"세션 생성/조회 실패: {e}", f"Session creation/lookup failed: {e}"))

@@ -49,7 +49,7 @@ def init_setting():
 
 
 # 파일을 캐시 저장(시간이 오래 걸리는 작업을 처리할 예정)
-@st.cache_resource(show_spinner="업로드한 파일을 처리 중입니다...")
+@st.cache_resource(show_spinner=False)
 def embed_file(file_path):
     # Get filename without extension for the vectorstore
     file_base_name = os.path.splitext(os.path.basename(file_path))[0]

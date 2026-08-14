@@ -15,14 +15,21 @@ import uuid
 # # from langchain_teddynote import logging
 from openai import OpenAI
 
+from i18n import ai_language_instruction, get_locale, lt, t
+from i18n.navigation import switch_to_locale_home
 # DynamoDB 관련 import 추가
 from modules.dynamo import initialize_session
+from modules.evaluation import (
+    build_application_evaluation_prompt,
+    format_concepts,
+    parse_application_evaluation,
+)
 
 # 로그인 상태 확인
 if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
-    if st.button("메인 페이지로 이동"):
-        st.switch_page("pages_group/00_Main.py")
+    st.error(t("auth.required"))
+    if st.button(t("auth.go_main")):
+        switch_to_locale_home()
     st.stop()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
@@ -45,10 +52,10 @@ if "score" not in st.session_state:
     st.session_state["score"] = 0
 
 if "missing_contents" not in st.session_state:
-    st.session_state["missing_contents"] = ""
+    st.session_state["missing_contents"] = []
 
 if "incorrect_contents" not in st.session_state:
-    st.session_state["incorrect_contents"] = ""
+    st.session_state["incorrect_contents"] = []
 
 # 메인 페이지 하단 리소스 섹션 노출 플래그
 if "show_resources" not in st.session_state:
@@ -144,39 +151,44 @@ initialize_session(phase_num=5)
 ######################################
 ########### Mainpage Logic ###########
 ######################################
-st.title("적용하기 💡")
-st.info("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 좌측 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.")
+st.title(lt("적용하기 💡", "Apply 💡"))
+st.info(lt("- 배운 내용을 새로운 상황에 적용해보며 개념을 더 깊게 이해해봅시다. \n - 지구 주위를 도는 달의 모습을 관찰해보고 그 이유를 설명해보세요. \n - 좌측 사이드바의 🧑🏻‍🏫**AI 선생님**과 대화하며 내 이해를 확인해보세요.", "- Apply what you've learned to new situations to deepen your understanding of the concepts. \n - Observe the Moon orbiting the Earth and explain why it behaves that way. \n - Chat with the 🧑🏻‍🏫**AI Tutor** in the left sidebar to check your understanding."))
 
 with st.container(border=True):
-    st.markdown(body="""
+    st.markdown(body=lt("""
     ## 등속 원운동
 
     놀이공원의 회전하는 관람차, 지구 주위를 도는 인공위성, 시계의 바늘 등은 일정한 속력으로 원을 그리며 운동하는데, 이러한 운동을 등속 원운동이라고 한다.
     등속 원운동 하는 물체는 속력이 변하지 않고 운동 방향만 변한다. (미래엔 교과서 16쪽)
-    """)
+    """, """
+    ## Uniform Circular Motion
 
-st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption="지구 주위를 도는 달의 모습")
+    A Ferris wheel at an amusement park, a satellite orbiting the Earth, and the hands of a clock all move in a circular path at a constant speed. This type of motion is called uniform circular motion.
+    In uniform circular motion, the speed of an object does not change — only its direction of motion changes. (Textbook p. 16)
+    """))
+
+st.image("https://bobmoler.wordpress.com/wp-content/uploads/2019/03/orbit_360p30-1.gif", caption=lt("지구 주위를 도는 달의 모습", "Moon's Orbit"))
 
 # 적용 질문
-applyingQuestion = "위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?"
+applyingQuestion = lt("위 그림과 같이 달이 공전 궤도를 유지하면서 계속 지구를 돌 수 있는 이유는 무엇일까요?", "As shown in the figure above, why is the Moon able to maintain its orbital path and keep orbiting the Earth?")
 
 # 적용하기 모범답안 (나중에 DB에서 불러오면 좋을 듯)
 applyingModeledAnswer = [
-    "지구가 달에 지구 중심방향으로 향하는 힘(중력)을 작용하고 있어서, 달은 지구 주변을 계속 원운동할 수 있습니다.",
-    "지구의 중력이 구심력으로 작용하여 달이 계속 원운동을 할 수 있습니다.",
-    "지구가 달을 끌어당기는 중력이 작용하고 있어서, 달은 공전 궤도를 유지할 수 있습니다.",
-    "중력이 구심력 역할을 하여 달이 지구 주변을 원운동할 수 있습니다.",
-    "지구 중심 방향으로 중력이 작용해서 달이 등속 원운동을 유지할 수 있습니다.",
-    "지구가 달에 지구 중심 방향으로 중력을 작용하고, 이 힘이 달의 원운동을 가능하게 합니다.",
-    "달에 작용하는 지구의 중력(구심력) 때문에 달은 궤도를 이탈하지 않고 계속 공전할 수 있습니다.",
-    "달과 지구 사이의 만유인력(중력) 때문에 달이 지구 중심 방향으로 힘을 받아 원운동 하게 됩니다."
+    lt("지구가 달에 지구 중심방향으로 향하는 힘(중력)을 작용하고 있어서, 달은 지구 주변을 계속 원운동할 수 있습니다.", "Because Earth exerts a gravitational force on the Moon directed toward Earth's center, the Moon is able to continuously orbit the Earth."),
+    lt("지구의 중력이 구심력으로 작용하여 달이 계속 원운동을 할 수 있습니다.", "Earth's gravity acts as centripetal force, allowing the Moon to continuously undergo circular motion."),
+    lt("지구가 달을 끌어당기는 중력이 작용하고 있어서, 달은 공전 궤도를 유지할 수 있습니다.", "Because the gravitational force that pulls the Moon toward Earth is acting, the Moon is able to maintain its orbital path."),
+    lt("중력이 구심력 역할을 하여 달이 지구 주변을 원운동할 수 있습니다.", "Gravity acts as centripetal force, allowing the Moon to orbit the Earth in circular motion."),
+    lt("지구 중심 방향으로 중력이 작용해서 달이 등속 원운동을 유지할 수 있습니다.", "Because gravity acts in the direction of Earth's center, the Moon is able to maintain uniform circular motion."),
+    lt("지구가 달에 지구 중심 방향으로 중력을 작용하고, 이 힘이 달의 원운동을 가능하게 합니다.", "Earth exerts gravity on the Moon directed toward Earth's center, and this force enables the Moon's circular motion."),
+    lt("달에 작용하는 지구의 중력(구심력) 때문에 달은 궤도를 이탈하지 않고 계속 공전할 수 있습니다.", "Due to Earth's gravity (centripetal force) acting on the Moon, the Moon is able to keep orbiting without leaving its orbit."),
+    lt("달과 지구 사이의 만유인력(중력) 때문에 달이 지구 중심 방향으로 힘을 받아 원운동 하게 됩니다.", "Due to the gravitational force (universal gravitation) between the Moon and Earth, the Moon receives a force directed toward Earth's center and undergoes circular motion.")
 ]
 
 # 핵심 개념(나중엔 DB에서 불러오면 좋을 듯)
-essential_contents = "등속 원운동"
+essential_contents = lt("등속 원운동", "uniform circular motion")
 
 # AI 튜터의 시스템 프롬프트
-TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.
+TUTOR_SYSTEM_PROMPT = lt("""당신은 친근하고 대화형 학습을 돕는 **물리 튜터**입니다. 항상 존댓말을 사용하며 긍정적이고 격려하는 태도로 일관된 대화를 유지하세요.
 
 다음 지침을 따라주세요:
 
@@ -322,7 +334,153 @@ TUTOR_SYSTEM_PROMPT = """당신은 친근하고 대화형 학습을 돕는 **물
 **🎭 기타:**
 - 학생이 장난스럽거나 부적절한 답변을 하더라도, 교육자로서 차분하고 친절하게 진지한 답변을 권유하세요.
 - 세 문장을 넘지 않도록 간결하게 대화를 생성하세요.
-- 이모지를 적절히 사용하여 친근감을 줍니다."""
+- 이모지를 적절히 사용하여 친근감을 줍니다.""", """You are a friendly, conversational **Physics Tutor** who supports interactive learning. Always maintain a consistently positive and encouraging attitude in conversation.
+
+Please follow these guidelines:
+
+**📝 When the student is attempting an answer (problem-solving):**
+1. Identify what the student understands and what they are missing.
+2. Provide questions or hints to help them reconsider the missing parts.
+3. ⚠️ **Strictly prohibited**: Never directly state the answer to the problem, mention example answers, or imply the exact answer.
+
+**❓ When the student asks a question (requesting concept/term explanation):**
+
+⚠️ **Important: Distinguish between questions and answer attempts!**
+
+**Judgment Principles (analyze the intent):**
+
+**The nature of a question:**
+- Student's intent: "Give me information/knowledge", "Explain this to me", "Teach me"
+- Formal characteristics:
+  * Contains a question form (?, what, why, how, etc.)
+  * Contains explanation/information request expressions ("please tell me", "explain", "definition", "meaning", "difference", etc.)
+- Purpose: To gain understanding of a concept/term/principle
+- Content: A question about the concept itself, not an answer to the problem
+
+**The nature of an answer attempt:**
+- Student's intent: "Evaluate my answer to this problem"
+- Formal characteristics: Declarative form, sentence attempting to answer the problem
+- Purpose: To have the accuracy of the problem-solving confirmed
+- Content: Attempting to explain the problem situation (the Moon's circular motion)
+
+**Judgment Criteria (identify intent first):**
+1. Is the student's intent "I don't understand — please explain"? → Question (provide concept explanation)
+2. Is the student's intent "I want to check if my answer is correct"? → Answer attempt (provide evaluation)
+3. Is the student's sentence asking about the concept/term itself? → Question
+4. Is the student's sentence attempting to interpret the problem situation? → Answer attempt
+
+**Handling Ambiguous Situations:**
+- When unclear: Interpret the student's intent as charitably as possible, but if there is even a slight hint of a question form, it is safer to treat it as a question.
+- Ambiguous expressions: For something like "circular motion is needed", while it is more likely an answer attempt in context, if unsure, treat as a question and guide kindly.
+
+If judged as a question → **Directly answer the student's question** and handle naturally according to context
+If judged as an answer attempt → Apply the "📝 Student's Answer Attempt" rules above
+
+**Question Handling Principles (clearly):**
+
+**Core Principles:**
+
+1. ✅ **Directly answer most questions**: Directly answer all questions about physics concepts, terms, principles, and relationships
+   - Example general concept questions:
+     * "Does gravity become the net force?" → Direct answer: "Yes, that's right! The net force acting on the Moon is the gravity that Earth exerts on the Moon. Since only this gravity acts on the Moon, gravity is exactly the net force. 😊"
+     * "Is centripetal force the net force?" → Direct answer
+     * "What's the difference between gravity and universal gravitation?" → Direct answer
+     * "What is the definition of circular motion?" → Direct answer
+     * "What is uniform circular motion?" → Direct answer
+     * "What is the unit of gravity?" → Direct answer
+     * "What is gravity?" → Direct answer
+     * All other physics concept questions → Direct answer
+   - **For questions not covered in the examples**: Understand the student's intent and use your physics knowledge to answer appropriately in context. Do not avoid the question or explain something else.
+
+2. ⚠️ **Very limited exceptions**: Only guide when the question directly asks for the **specific answer** to this problem
+   - The answer to this problem = A question directly asking which of "toward Earth's center", "gravity", or "circular motion" is correct
+   - Judgment criteria: Only guide when the question asks for the **specific answer to this problem (direction, name of force, result of motion)**
+   - Examples:
+     - ✅ Guide: "In which direction does gravity act?" (the core answer to this problem)
+     - ✅ Guide: "Why can the Moon orbit?" (the core answer to this problem)
+     - ❌ Direct answer: "Does gravity become the net force?" (general concept)
+     - ❌ Direct answer: "What is centripetal force?" (general concept)
+     - ❌ Direct answer: "What's the difference between gravity and universal gravitation?" (general concept)
+   - Guidance method: Instead of answering directly, use questions to guide the student to think for themselves
+     * ✅ Correct: "Great question! 😊 Gravity acts in the direction connecting two objects. Between Earth and the Moon, in which direction does the Moon experience gravity? Let's think about it. 🌙"
+     * ❌ Avoid: "It points toward Earth's center." (directly revealing the answer)
+
+3. ✅ **Answer physically accurately**: Use physically accurate expressions when explaining concepts.
+   - When explaining the direction of gravity, **action-reaction** should be mentioned.
+   - e.g., "The gravity Earth exerts on the Moon is directed toward Earth's center, and the gravity the Moon exerts on Earth is directed toward the Moon's center. These two forces are an action-reaction pair."
+   - In the problem context (the Moon's motion), we are talking about the gravity acting on the Moon: "The gravity Earth exerts on the Moon is directed toward Earth's center."
+   - ❌ Avoid: "Gravity is directed toward Earth's center" (unclear what it acts on or who acts on whom)
+
+4. ✅ **Natural conversation flow**: After answering the student's question, connect naturally to the problem if appropriate, or not, depending on context.
+   - General concept questions: After answering, optionally connect naturally to the problem
+   - Detailed/advanced questions (units, constants, history, etc.): Answering alone is sufficient; no need to force a connection to the problem
+   - Questions unrelated to the problem: Answer kindly and maintain a learning atmosphere
+
+5. ⚠️ **Strictly prohibited**:
+   - Directly stating the answer to the problem ("The Moon undergoes circular motion because it receives gravity toward Earth's center")
+   - **Directly answering a question that asks for the problem's answer** ("In which direction does gravity act?" → "Toward Earth's center." ❌)
+   - Ignoring the question and explaining something else
+   - Using physically inaccurate expressions
+
+**Correct/Incorrect Examples of Question Handling:**
+
+❌ Incorrect response:
+- Q: "What is gravity?"
+- A: "You're curious about gravity! Let's think about the direction of the force acting on the Moon and how this force affects the Moon's motion?" (Guiding directly to the problem without explaining the concept)
+
+✅ Correct response:
+- Q: "What is gravity?"
+- A: "Gravity is an attractive force that acts between two objects. It acts between all objects that have mass. So gravity also acts between Earth and the Moon. In which direction is this force? 🌙"
+
+❌ Incorrect response:
+- Q: "What's the difference between gravity and universal gravitation?"
+- A: "What a great question! 😊 But for this problem, let's think about why the Moon keeps orbiting the Earth." (Doesn't explain the difference)
+
+✅ Correct response:
+- Q: "What's the difference between gravity and universal gravitation?"
+- A: "Universal gravitation is the fundamental principle behind gravity. The force through which universal gravitation acts is called gravity. In other words, universal gravitation is the principle, and gravity is the name of that force. 😊 So how does this force between Earth and the Moon affect the Moon's motion? 🌙"
+
+❌ Incorrect response:
+- Q: "Please explain the definition of circular motion"
+- A: "You're curious about circular motion! Let's think together about what circular motion is and what force enables the Moon to keep orbiting the Earth. 🌙" (Guides directly to the problem without explaining the definition)
+
+✅ Correct response:
+- Q: "Please explain the definition of circular motion"
+- A: "Circular motion is when an object moves along a circular path while maintaining a constant distance from the center. When the speed is constant, it is called uniform circular motion. So the Moon orbiting Earth is also circular motion. What force makes this circular motion possible? 🌙"
+
+❌ Incorrect response (directly revealing the problem answer):
+- Q: "In which direction does gravity act?"
+- A: "Gravity is an attractive force that acts between two objects. Between Earth and the Moon, this gravity acts, and the direction of this force points toward Earth's center. So how does this force affect the Moon's motion? 🌙" (Directly reveals the answer + no mention of action-reaction)
+
+✅ Correct response (guiding toward the answer):
+- Q: "In which direction does gravity act?"
+- A: "Great question! 😊 Gravity acts in the direction connecting two objects. Between Earth and the Moon, in which direction does the Moon experience gravity? Let's think about it. 🌙"
+
+✅ Correct response (explaining a general concept):
+- Q: "What is the direction of gravity?" (general concept question)
+- A: "The gravity Earth exerts on the Moon is directed toward Earth's center, and the gravity the Moon exerts on Earth is directed toward the Moon's center. These two forces are an action-reaction pair. 😊"
+
+✅ Correct response (general concept question not in examples):
+- Q: "Does gravity become the net force?"
+- A: "Yes, that's right! The net force acting on the Moon is the gravity that Earth exerts on the Moon. Since only this gravity acts on the Moon, gravity is exactly the net force. 😊"
+  → A question not in the examples, but directly answered using the student's intent and physics knowledge.
+
+**🔄 Transfer Promotion - Important!:**
+When a student struggles to answer or only partially understands, connect to prior learning experiences:
+1. **Recall prior experience**: "You thought about a satellite orbiting a planet earlier. What force was acting then?"
+2. **Find similarities**: "Both a satellite and the Moon are in circular motion. What do they have in common?"
+3. **Present other examples**: "Think about swings at a playground or spinning a ball on a string. These situations are similar."
+4. **Connect to general principles**: "For circular motion — whether it's a satellite or a spinning ball — in which direction does the force need to act?"
+
+Example feedback:
+- "You learned why a satellite keeps orbiting in the 'Think' through 'Reflect' stages. The Moon should be similar. 🤔"
+- "On a playground roundabout, you feel pulled toward the center. The Moon is experiencing a similar force."
+- "A satellite, the Moon, a roundabout... they all undergo circular motion. In which direction is the force they all need?"
+
+**🎭 Miscellaneous:**
+- Even if a student gives a playful or inappropriate answer, calmly and kindly encourage a serious response as an educator.
+- Keep the conversation concise — do not exceed three sentences.
+- Use emojis appropriately to create a friendly atmosphere.""") + ai_language_instruction()
 
 
 def format_conversation_history():
@@ -330,9 +488,9 @@ def format_conversation_history():
     if not st.session_state.chat_history_applying:
         return ""
     
-    history_text = "\n\n=== 이전 대화 기록 ===\n"
+    history_text = lt("\n\n=== 이전 대화 기록 ===\n", "\n\n=== Previous Conversation History ===\n")
     for msg in st.session_state.chat_history_applying:
-        role = "학생" if msg["role"] == "user" else "AI 선생님"
+        role = lt("학생", "Student") if msg["role"] == "user" else lt("AI 선생님", "AI Teacher")
         history_text += f"{role}: {msg['content']}\n"
     return history_text
 
@@ -569,6 +727,15 @@ def evaluate_answer_with_llm(user_answer):
 잘못된개념: [달 중심 같은 물리적 오류만. 없으면 빈 괄호만 표시: []]
 피드백: [위 예시 패턴을 따라, 구체적이고 질문 형태로, 세 문장 이내]"""
 
+        # 언어 중립 JSON 평가 프롬프트로 교체합니다. 위의 기존 루브릭은
+        # 교육 설계 참고용으로 유지하고 실제 호출에는 이 프롬프트를 사용합니다.
+        prompt = build_application_evaluation_prompt(
+            question=applyingQuestion,
+            student_answer=user_answer,
+            conversation_history=conversation_history,
+            locale=get_locale(),
+        )
+
         # LLM에 전달된 평가 프롬프트를 DB에 저장
         save_message_to_db(
             role="system",
@@ -583,6 +750,7 @@ def evaluate_answer_with_llm(user_answer):
                 {"role": "system", "content": TUTOR_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
+            response_format={"type": "json_object"},
             temperature=0.1,
             max_tokens=400
         )
@@ -601,44 +769,18 @@ def evaluate_answer_with_llm(user_answer):
             turn=current_turn
         )
 
-        # 파싱
-        lines = evaluation.split("\n")
-        is_correct = "정답" in lines[0]
-        score = 0
-        missing = ""
-        incorrect = ""
-        feedback = ""
-        
-        for line in lines:
-            if line.startswith("점수:"):
-                try:
-                    score = int(line.split(":")[1].strip())
-                except:
-                    score = 0
-            elif line.startswith("놓친개념:"):
-                missing = line.split(":", 1)[1].strip()
-            elif line.startswith("잘못된개념:"):
-                incorrect = line.split(":", 1)[1].strip()
-            elif line.startswith("피드백:"):
-                feedback = line.split(":", 1)[1].strip()
-        
-        # 여러 줄 피드백 처리
-        if not feedback:
-            feedback_start = False
-            feedback_lines = []
-            for line in lines:
-                if line.startswith("피드백:"):
-                    feedback_start = True
-                    feedback_lines.append(line.split(":", 1)[1].strip())
-                elif feedback_start and line.strip():
-                    feedback_lines.append(line.strip())
-            feedback = "\n".join(feedback_lines)
-        
-        return is_correct, score, missing, incorrect, feedback
+        parsed = parse_application_evaluation(evaluation)
+        return (
+            parsed["is_correct"],
+            parsed["score"],
+            parsed["missing_concepts"],
+            parsed["incorrect_concepts"],
+            parsed["feedback"],
+        )
         
     except Exception as e:
-        st.error(f"답변 평가 중 오류: {str(e)}")
-        return False, 0, "", "", "평가 중 오류가 발생했습니다."
+        st.error(lt(f"답변 평가 중 오류: {e}", f"Error evaluating answer: {e}"))
+        return False, 0, [], [], lt("평가 중 오류가 발생했습니다.", "An error occurred during evaluation.")
 
 
 def add_message_to_history(role, content):
@@ -671,7 +813,10 @@ def process_answer(user_input):
     current_turn = st.session_state["phase5_current_turn"]
 
     # 사용자 입력을 먼저 대화 기록에 추가
-    user_message = f"(제출한 답변): {user_input}"
+    user_message = lt(
+        f"(제출한 답변): {user_input}",
+        f"(Submitted answer): {user_input}",
+    )
     add_message_to_history("user", user_message)
     
     # 사용자 답변을 DB에 저장
@@ -689,7 +834,7 @@ def process_answer(user_input):
     
     # AI 응답 생성 중 상태 표시
     with status_container:
-        st.info("🤔 AI가 답변을 평가하고 있습니다...")
+        st.info(lt("🤔 AI가 답변을 평가하고 있습니다...", "🤔 Evaluating..."))
     
     # LLM을 사용한 답변 평가
     is_correct, score, missing, incorrect, ai_feedback = evaluate_answer_with_llm(user_input)
@@ -703,15 +848,27 @@ def process_answer(user_input):
     if score >= 80:
         # 정답! 완료 메시지
         stars = "⭐⭐⭐⭐⭐"
-        completion_msg = f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. "
+        completion_msg = lt(
+            f"**현재 점수: {stars}**\n\n축하합니다!🎉 충분히 잘 이해하셨네요. ",
+            f"**Current score: {stars}**\n\nCongratulations! 🎉 You have demonstrated a strong understanding. ",
+        )
         
         # missing_contents가 실제로 있는 경우만 표시
-        missing_clean = missing.strip().strip("[]").strip()
-        if missing_clean and missing_clean.lower() not in ["없음", "none", ""]:
-            completion_msg += f"지금 답변에 [{missing_clean}] 도 포함시키면 더 완벽한 답변이 될 거예요."
+        missing_clean = format_concepts(missing, get_locale())
+        if missing_clean:
+            completion_msg += lt(
+                f"지금 답변에 [{missing_clean}]도 포함시키면 더 완벽한 답변이 될 거예요.",
+                f"Your answer would be even stronger if it also included [{missing_clean}].",
+            )
         
-        completion_msg+= f"\n\n모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]"
-        completion_msg += "\n\n**메인 화면의 답변 작성란에 최종 답안을 다시 작성해보세요!**"
+        completion_msg += lt(
+            f"\n\n모범 답안은 다음과 같습니다.\n\n[**{applyingModeledAnswer[0]}**]",
+            f"\n\nHere is a model answer.\n\n[**{applyingModeledAnswer[0]}**]",
+        )
+        completion_msg += lt(
+            "\n\n**메인 화면의 답변 작성란에 최종 답안을 다시 작성해보세요!**",
+            "\n\n**Now rewrite your final answer in the response box on the main screen.**",
+        )
         
         add_message_to_history("assistant", completion_msg)
         
@@ -731,7 +888,10 @@ def process_answer(user_input):
     else:
         # 80점 미만 - 피드백 제공
         stars = score_to_stars(score)
-        feedback_msg = f"**현재 점수: {stars}**\n\n{ai_feedback}"
+        feedback_msg = lt(
+            f"**현재 점수: {stars}**\n\n{ai_feedback}",
+            f"**Current score: {stars}**\n\n{ai_feedback}",
+        )
         add_message_to_history("assistant", feedback_msg)
     
         # 오답 피드백을 DB에 저장
@@ -752,7 +912,7 @@ def process_answer(user_input):
 # 메인 화면
 if not st.session_state.get("show_resources", False):
     # 메인 화면에 질문 표시
-    st.markdown("**문제 상황**")
+    st.markdown(lt("**문제 상황**", "**Problem Situation**"))
     st.markdown(applyingQuestion)
 
     # text_area의 키보드 단축키 힌트 숨기기
@@ -784,16 +944,16 @@ if not st.session_state.get("show_resources", False):
             # 최종 답안 제출 완료 후 "더 알아보기" 버튼 표시를 DB에 저장
             save_message_to_db(
                 role="assistant",
-                content="최종 답안 제출 완료",
+                content=lt("최종 답안 제출 완료", "Final answer submitted"),
                 content_type="final_answer_submitted",
                 turn=st.session_state.get("phase5_current_turn", 0)
             )
 
         st.markdown("---")
-        st.markdown("### 🎉 축하합니다! '더 알아보기' 버튼을 눌러 비슷한 사례를 확인하고 오늘 수업을 마무리해보세요")
+        st.markdown(lt("### 🎉 축하합니다! '더 알아보기' 버튼을 눌러 비슷한 사례를 확인하고 오늘 수업을 마무리해보세요", "### 🎉 Learning Complete! Click the 'Learn More' button to explore similar examples and wrap up today's lesson."))
 
 
-        if st.button("📚 더 알아보기", type="primary", use_container_width=True, key="main_show_resources_button"):
+        if st.button(lt("📚 더 알아보기", "📚 Learn More"), type="primary", use_container_width=True, key="main_show_resources_button"):
             st.session_state["show_resources"] = True
             st.rerun()
     
@@ -802,13 +962,13 @@ if not st.session_state.get("show_resources", False):
         # 답변 입력 영역
         text_area_key = st.session_state.get("text_area_key", 0)
         reason = st.text_area(
-            label="내 답변을 작성해주세요.",
+            label=lt("내 답변을 작성해주세요.", "Write your answer here."),
             height=200,
             key=f"text_area_{text_area_key}"
         )
 
         submit_button = st.button(
-            label="제출하기",
+            label=lt("제출하기", "Submit"),
             type="primary",
             use_container_width=True
         )
@@ -818,10 +978,10 @@ if not st.session_state.get("show_resources", False):
             
             # 답변이 비어있으면 경고
             if not reason or not reason.strip():
-                st.warning("답변을 작성해주세요.")
+                st.warning(lt("답변을 작성해주세요.", "Please write your answer before submitting."))
             # 같은 답변이 연속으로 제출되는 것을 방지 (5초 이내 중복 제출 방지)
             elif current_time - st.session_state.get("last_submission_time", 0) < 5:
-                st.warning("잠시 후 다시 시도해주세요.")
+                st.warning(lt("잠시 후 다시 시도해주세요.", "Please wait a moment before trying again."))
             else:
                 # 대화 완료 상태에서 제출 = 최종 답안 재제출
                 if st.session_state.get("conversation_completed", False):
@@ -835,18 +995,20 @@ if not st.session_state.get("show_resources", False):
                     st.session_state["submission_triggered"] = True
                     st.session_state["text_area_key"] = st.session_state.get("text_area_key", 0) + 1
                     st.session_state["last_submission_time"] = current_time
-                    st.success("제출 완료! 좌측 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)")
+                    st.success(lt("제출 완료! 좌측 사이드바에서 🧑🏻‍🏫AI 선생님의 피드백을 확인해보세요:)", "Submitted! Check the 🧑🏻‍🏫AI Tutor's feedback in the left sidebar :)"))
 
 # 메인 하단 리소스 섹션
 if st.session_state.get("show_resources", False):
-    st.subheader("더 알아봅시다!")
+    st.subheader(lt("더 알아봅시다!", "Additional Resources"))
+    if get_locale() == "en":
+        st.caption(t("locale.korean_resource_notice"))
     with st.container(border=True):
-        tab1, tab2 = st.tabs(["읽어보면 좋은 글", "관련 유튜브 영상"])
+        tab1, tab2 = st.tabs([lt("읽어보면 좋은 글", "Recommended Articles"), lt("관련 유튜브 영상", "Related YouTube Videos")])
 
         with tab1:
-            st.write("⏬ 아래 기사를 참고해보세요 ⏬ (기사 제목 클릭)")
+            st.write(lt("⏬ 아래 기사를 참고해보세요 ⏬ (기사 제목 클릭)", "⏬ Check out the article below ⏬ (Click the article title)"))
             st.markdown(
-                """
+                lt("""
                 <style>
                 .article-link {
                     font-size: 1.5em;
@@ -864,13 +1026,31 @@ if st.session_state.get("show_resources", False):
                 <div class="article-link">
                     <a href="https://blog.hyundai-rotem.co.kr/671" target="_blank">철도에 사용되는 과학기술: 고속 주행에도 안전한 커브는 OOO덕분?!</a>
                 </div>
-                """,
+                """, """
+                <style>
+                .article-link {
+                    font-size: 1.5em;
+                    font-weight: bold;
+                }
+                .article-link a {
+                    text-decoration: underline;
+                    color: #0066cc;
+                }
+                .article-link a:hover {
+                    text-decoration: underline;
+                    color: #004499;
+                }
+                </style>
+                <div class="article-link">
+                    <a href="https://blog.hyundai-rotem.co.kr/671" target="_blank">Science in Railways: Safe Curves at High Speeds — All Thanks to OOO?!</a>
+                </div>
+                """),
                 unsafe_allow_html=True
             )
             st.image("https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdna%2Fc4OysX%2FbtruRMLUUsC%2FAAAAAAAAAAAAAAAAAAAAAJfF5rx9v7vc9kbmx8Ez9-eVnTSHIXqTV7EEN-OPyi4r%2Fimg.jpg%3Fcredential%3DyqXZFxpELC7KVnFOS48ylbz2pIh7yKj8%26expires%3D1759244399%26allow_ip%3D%26allow_referer%3D%26signature%3DufVaE0921PMCrw57Gpu%252FanjcQZs%253D")
 
         with tab2:
-            st.write("유튜브 영상으로 알아보는 오늘의 과학 개념")
+            st.write(lt("유튜브 영상으로 알아보는 오늘의 과학 개념", "Learn today's science concept through a YouTube video"))
             st.video("https://youtu.be/FHrR_W4w_MA?feature=shared")
 
 
@@ -878,20 +1058,23 @@ if st.session_state.get("show_resources", False):
 ########### Sidebar Logic ###########
 #####################################
 with st.sidebar:
-    st.write("**AI 선생님**의 피드백")
+    st.write(lt("**AI 선생님**의 피드백", "**AI Tutor** Feedback"))
     
     messages = st.container(height=400)
-    st.write("답안은 완전한 문장 형태로 작성해주세요:)")
+    st.write(lt("답안은 완전한 문장 형태로 작성해주세요:)", "Please write your answer in complete sentences :)"))
     status_container = st.empty()
     ai_info = st.empty()
     
 
     # 초기 메시지 추가 (한 번만)
     if len(st.session_state.chat_history_applying) == 0:
-        initial_message = (
+        initial_message = lt(
             "앞서 '생각하기'부터 '돌아보기' 단계까지 행성 주변을 도는 인공위성의 원운동을 배웠죠? 🛰️\n\n"
             "이번에는 비슷하지만 조금 다른 상황을 생각해볼까요. 지구 주변을 도는 달도 원운동을 하고 있어요. 🌙\n\n"
-            "인공위성과 달, 이 둘의 운동에는 어떤 공통점이 있을까요? 같은 물리 원리로 설명될 수 있을까요?"
+            "인공위성과 달, 이 둘의 운동에는 어떤 공통점이 있을까요? 같은 물리 원리로 설명될 수 있을까요?",
+            "From the Think through Review stages, you learned about a satellite's circular motion around a planet. 🛰️\n\n"
+            "Now let's consider a similar but slightly different situation: the Moon also moves around Earth. 🌙\n\n"
+            "What do a satellite and the Moon have in common, and can the same physics explain both motions?",
         )
         add_message_to_history("assistant", initial_message)
         
@@ -922,8 +1105,8 @@ with st.sidebar:
     
     # 사이드바 채팅 입력창 (답변 제출 후에만 표시)
     if has_submitted_answer and not st.session_state.get("conversation_completed", False):
-        if user_input := st.chat_input("AI 선생님과 대화를 계속하세요...", key="sidebar_chat_input"):
+        if user_input := st.chat_input(lt("AI 선생님과 대화를 계속하세요...", "Continue chatting with the AI Tutor..."), key="sidebar_chat_input"):
             process_answer(user_input)
     elif not has_submitted_answer:
         # 답변 제출 전 안내 메시지
-        ai_info.info("내 답안을 제출하면 🧑🏻‍🏫AI 선생님과 대화가 시작됩니다!")
+        ai_info.info(lt("내 답안을 제출하면 🧑🏻‍🏫AI 선생님과 대화가 시작됩니다!", "Submit your answer to start a conversation with the 🧑🏻‍🏫AI Tutor!"))

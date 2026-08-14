@@ -22,7 +22,7 @@ def png_to_bytesio(file_path):
 
 
 # 이미지을 캐시 저장(시간이 오래 걸리는 작업을 처리할 예정)
-@st.cache_resource(show_spinner="업로드한 이미지를 처리 중입니다...")
+@st.cache_resource(show_spinner=False)
 def process_png_to_bytesio(file_path) -> str:
     # 업로드한 파일을 캐시 디렉토리에 저장합니다.
     file_content = png_to_bytesio(file_path).getvalue()
@@ -94,7 +94,7 @@ def overlay_png_and_np(base_image_path: str, overlay_np: np.ndarray, overlay_alp
     return Image.alpha_composite(base_img, overlay_img)
 
 
-@st.cache_resource(show_spinner="캔버스 이미지를 최적화하고 로딩 중...")
+@st.cache_resource(show_spinner=False)
 def load_and_optimize_canvas_image(image_path, target_size=(500, 500)):
     """
     캔버스 이미지를 강제로 로딩하고 최적화합니다.
@@ -238,7 +238,7 @@ def load_image_in_thread(image_path, target_size=(500, 500)):
         return Image.new('RGBA', target_size, (238, 238, 238, 255))
 
 
-@st.cache_resource(show_spinner="캔버스 이미지를 로딩 중...")
+@st.cache_resource(show_spinner=False)
 def get_cached_image_with_thread(image_path, target_size=(500, 500)):
     """
     스레드 풀을 사용하여 이미지를 로딩합니다.

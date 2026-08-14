@@ -1,0 +1,39 @@
+app:
+  group_title: "📚 Easy Physics ✨"
+  title: "📚 Easy Physics ✨"
+  description: "**Easy Physics** is an AI-powered learning tool for studying physics concepts and solving problems."
+
+navigation:
+  main: "Main Page 🚪"
+  introduction: "Introduction 🚀"
+  think: "Think 🤔"
+  experiment: "Experiment 🧪"
+  review: "Review 🧐"
+  apply: "Apply 💡"
+  language: "Language"
+
+locale:
+  en: "English"
+  ko: "한국어"
+  change_warning: "Changing the language will end the current learning session and start a new one."
+  confirm: "Change language"
+  cancel: "Cancel"
+  korean_image_notice: "Some text in this learning image is available in Korean only."
+  korean_resource_notice: "This external learning resource is available in Korean."
+
+auth:
+  username: "Username"
+  password: "Password"
+  login: "Log in"
+  invalid_username: "Please check your username."
+  invalid_password: "Please check your password."
+  success: "Login successful! Welcome, {username}!"
+  required: "Login required. Please log in from the Main Page."
+  go_main: "Go to Main Page"
+
+common:
+  submit: "Submit"
+  next: "Next"
+  previous: "Previous"
+  loading: "Loading..."
+  error: "An error occurred: {error}"

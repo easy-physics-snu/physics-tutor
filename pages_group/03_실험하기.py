@@ -28,17 +28,26 @@ from langchain_openai import ChatOpenAI
 # from modules.keywords import create_keyword
 # import simulation.simulation as simulation
 
-from modules.prompts import PEER_AI_03EXPERIMENT_PROMPT
+from i18n import ai_language_instruction, get_locale, lt, t
+from i18n.navigation import switch_to_locale_home
+from i18n.prompt_loader import load_localized_values
+from i18n.simulation import localize_simulation_html
+import modules.prompts as localized_prompts
 from modules.dynamo import initialize_session
 import dms.Intermediary as Intermediary
+
+(PEER_AI_03EXPERIMENT_PROMPT,) = load_localized_values(
+    localized_prompts,
+    "PEER_AI_03EXPERIMENT_PROMPT",
+)
 
 set_verbose(False)
 
 # 로그인 상태 확인
 if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
-    if st.button("메인 페이지로 이동"):
-        st.switch_page("pages_group/00_Main.py")
+    st.error(t("auth.required"))
+    if st.button(t("auth.go_main")):
+        switch_to_locale_home()
     st.stop()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
@@ -199,20 +208,24 @@ def save_message_to_db(role: str, content: str, content_type: str = "text", llm_
 ######################################
 ########### Mainpage Logic ###########
 ######################################
-st.set_page_config(layout="wide")
-
-st.title("실험하기 🧪")
+st.title(lt("실험하기 🧪", "Experiment 🧪"))
+if get_locale() == "en":
+    st.caption(t("locale.korean_image_notice"))
 
 # Create a container for the info message and tooltip
 info_container = st.container()
 left_col, right_col = info_container.columns([4, 1])
 
 with left_col:
-    message = """
+    message = lt("""
 - 앞에서 제출한 답을 떠올리며 시뮬레이션을 관찰하고 조작해보세요.
 - 시뮬레이션에 대해서 궁금한건 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.
 - 🤓**AI 친구**와의 대화를 바탕으로 시뮬레이션을 조작해보고, 관찰 결과를 바탕으로 궁금한 것을 **🤓AI 친구**에게 다시 물어보세요.
-"""
+""", """
+- Recall the answer you submitted earlier and observe and interact with the simulation.
+- If you have questions about the simulation, ask your 🤓**AI Friend** in the left sidebar.
+- Interact with the simulation and ask **🤓AI Friend** follow-up questions based on what you observe.
+""")
 #- ⭐ **[내 실험실]에서는 내가 제출한 답을 시뮬레이션 해 볼 수 있어요** ⭐
 
     st.info(message)
@@ -298,7 +311,7 @@ with right_col:
 
     # Get user's previous answer and drawing from session state
     user_drawing = st.session_state.get("predict_saved_image_path", None)
-    user_reason = st.session_state.get("predict_user_reason", "이전 답안이 없습니다.")
+    user_reason = st.session_state.get("predict_user_reason", lt("이전 답안이 없습니다.", "No previous answer found."))
     
     # Convert saved image path to base64 image if it exists
     image_src = PROBLEM_IMAGE_PATH
@@ -315,7 +328,7 @@ with right_col:
     # Create tooltip content with styled button
     if user_drawing is not None and user_reason is not None:
     
-        tooltip_html = f"""
+        tooltip_html = lt(f"""
             <div class="button-container">
             <div class="tooltip-wrapper">
                 <button class="custom-button">
@@ -326,9 +339,20 @@ with right_col:
                     <img src="{image_src}" alt="이전 답안 이미지">
                     <div class="drawing-explanation" style="font-size: 15px;">예상의 이유</div>
                     <div class="answer-text">{user_reason}</div>
-            </div>"""
+            </div>""", f"""
+            <div class="button-container">
+            <div class="tooltip-wrapper">
+                <button class="custom-button">
+                        Answer from &lt;Think&gt;
+                </button>
+                <div class="tooltip-content">
+                    <div class="drawing-explanation" style="font-size: 15px;">Canvas</div>
+                    <img src="{image_src}" alt="Previous answer image">
+                    <div class="drawing-explanation" style="font-size: 15px;">Reason for prediction</div>
+                    <div class="answer-text">{user_reason}</div>
+            </div>""")
     else:
-        tooltip_html = f"""
+        tooltip_html = lt(f"""
         <div class="button-container">
         <div class="tooltip-wrapper">
             <button class="custom-button">
@@ -336,18 +360,29 @@ with right_col:
             </button>
             <div class="tooltip-content">
                 <div class="answer-text">아직 제출한 답안이 없습니다! '생각하기 🤔'에서 답안을 제출해주세요:)</div>
-            </div>"""
+            </div>""", f"""
+        <div class="button-container">
+        <div class="tooltip-wrapper">
+            <button class="custom-button">
+                    Answer from &lt;Think&gt;
+            </button>
+            <div class="tooltip-content">
+                <div class="answer-text">No answer submitted yet! Please submit your answer in 'Think 🤔' :)</div>
+            </div>""")
     st.markdown(tooltip_html, unsafe_allow_html=True)
 
 with st.expander(
-    label="문제 보기 🔍",
+    label=lt("문제 보기 🔍", "View Problem 🔍"),
     expanded=False
     ):
     main_tab1 = st.container(border=True)
-    main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 우주선이 있습니다.\n
+    main_tab1.write(lt("""우주 공간에 새로운 행성을 찾아 다니는 우주선이 있습니다.\n
 드디어! 새로운 행성을 발견한 우주선은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
 **이때, 우주선에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 나타내고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
-""")
+""", """There is a spacecraft traveling through space in search of a new planet.\n
+At last! The spacecraft has discovered a new planet and is about to enter a circular orbit around it, performing **uniform circular motion**. \n
+**At this moment, (1) draw an arrow on the canvas to show the direction of the net force acting on the spacecraft, and (2) write the reason for your answer below.**
+"""))
     with main_tab1:
         _, col2, _ = st.columns(3, vertical_alignment='center')
         col2.image(
@@ -371,12 +406,13 @@ if 'last_input' not in st.session_state:
 ###################################
 with st.container(border=True):
 
-    st.markdown("<div style='font-size: 1.3rem; font-weight: 600; margin: 0 0 0px 0;'>물리 시뮬레이션 실험실</div>", unsafe_allow_html=True)
+    st.markdown(lt("<div style='font-size: 1.3rem; font-weight: 600; margin: 0 0 0px 0;'>물리 시뮬레이션 실험실</div>", "<div style='font-size: 1.3rem; font-weight: 600; margin: 0 0 0px 0;'>Physics Simulation Lab</div>"), unsafe_allow_html=True)
 
     # 로컬 HTML 파일 임베드
     try:
         with open('simulation/circular-motion-sim_responsive.html', 'r', encoding='utf-8') as f:
             circular_html_content = f.read()
+        circular_html_content = localize_simulation_html(circular_html_content, get_locale())
         
         components.html(circular_html_content, height=590, width=870, scrolling=False)
 
@@ -386,7 +422,7 @@ with st.container(border=True):
         [data-testid="stIFrame"] > iframe { width: 100% !important; }
         </style>""", unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"로컬 시뮬레이션을 불러오는 중 오류가 발생했습니다: {e}")
+        st.error(lt(f"로컬 시뮬레이션을 불러오는 중 오류가 발생했습니다: {e}", f"An error occurred while loading the local simulation: {e}"))
     
     # 커스텀 경계 박스 종료
     st.markdown('</div>', unsafe_allow_html=True)
@@ -411,20 +447,31 @@ def get_phase2_learning_context():
             formatted_selection = ", ".join(selection) if isinstance(selection, str) else selection
             
             if justification and selection:
-                difficulties_summary.append(f"- 선택 지표: {formatted_selection}\n  근거: {justification}")
+                difficulties_summary.append(
+                    lt(
+                        f"- 선택 지표: {formatted_selection}\n  근거: {justification}",
+                        f"- Selected indicators: {formatted_selection}\n  Rationale: {justification}",
+                    )
+                )
         except json.JSONDecodeError:
             continue
     
     if not difficulties_summary:
         return ""
     
-    context = f"""
+    context = lt(f"""
 # PHASE2 학습 맥락 정보
 학습자가 앞 단계(Phase2: 생각하기)에서 겪은 주요 어려움과 평가 기록:
 {chr(10).join(difficulties_summary)}
 
 이 정보를 참고하여, 학습자가 겪었던 어려움을 바탕으로 실험 단계에서 더 적절한 안내와 피드백을 제공하세요.
-"""
+""", f"""
+# PHASE 2 LEARNING CONTEXT
+The student's main difficulties and assessment history from Phase 2 (Think):
+{chr(10).join(difficulties_summary)}
+
+Use this information to provide more appropriate guidance and feedback during the experiment.
+""")
     return context
 
 
@@ -432,9 +479,9 @@ def get_phase2_learning_context():
 def generate_chain(model_name=INQUIRY_ASSISTANT_OPENAI_MODEL, system_prompt=None):
 
     if system_prompt is None:
-        full_system_prompt = PEER_AI_03EXPERIMENT_PROMPT
+        full_system_prompt = PEER_AI_03EXPERIMENT_PROMPT + ai_language_instruction()
     else:
-        full_system_prompt = system_prompt
+        full_system_prompt = system_prompt + ai_language_instruction()
 
     # 현재 선택된 operation 값 가져오기
     prompt = ChatPromptTemplate.from_messages([
@@ -481,7 +528,7 @@ with st.sidebar:
     # toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
     # st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
-    st.write("**AI 친구**에게 물어보기")
+    st.write(lt("**AI 친구**에게 물어보기", "Ask your **AI Friend**"))
     messages = st.container(height=400)
 
     # 이전 대화를 출력
@@ -498,7 +545,7 @@ with st.sidebar:
 
     # 초기 대화 기록 추가
     if len(st.session_state["tutor_messages"]) == 0:
-        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("시뮬레이션에 대해서 궁금한게 있으면 뭐든지 물어봐!")
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write(lt("시뮬레이션에 대해서 궁금한게 있으면 뭐든지 물어봐!", "Ask me anything you're curious about with the simulation!"))
     else:
         pass
 
@@ -522,7 +569,7 @@ with st.sidebar:
     #     kw_button_2 = None
 
     # 사용자의 입력
-    user_input = st.chat_input("궁금한 내용을 물어보세요!")
+    user_input = st.chat_input(lt("궁금한 내용을 물어보세요!", "Ask anything you're curious about!"))
 
     # 만약에 사용자 입력이 들어오면...
     if user_input: # and not (kw_button_1 and st.session_state.get("toggle_recommended_questions", False)) and not (kw_button_2 and st.session_state.get("toggle_recommended_questions", False)):
@@ -542,7 +589,7 @@ with st.sidebar:
             turn=current_turn
         )
 
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+        with st.spinner(lt("AI가 답변을 생성하고 있습니다...", "AI is generating a response...")):
 
             if st.session_state["phase3_intermediary"] is None:
                 intermediary = Intermediary.Intermediary(
@@ -629,7 +676,12 @@ with st.sidebar:
             conv_chain = generate_chain(selected_model, full_system_prompt)
 
             # LLM에 전달될 사용자 프롬프트 생성
-            user_prompt_for_llm = prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input
+            user_prompt_for_llm = (
+                prompt[-1]["content"]
+                + "---\n\n"
+                + lt("**<사용자의 입력>**:\n", "**<User input>**:\n")
+                + user_input
+            )
 
             # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
             save_message_to_db(
@@ -671,9 +723,9 @@ col1, col2, col3 = st.columns([5, 2, 2])
 # Place the button in the last column
 with col1:
     if st.button(
-        label="이전단계로",
+        label=lt("이전단계로", "Previous Step"),
         icon="⏪",
-        help="생각하기로 이동하기",
+        help=lt("생각하기로 이동하기", "Go to Think"),
         type="primary"
     ):
         st.switch_page("pages_group/02_생각하기.py")
@@ -683,8 +735,8 @@ user_turns = st.session_state.get("phase3_current_turn", 0)
 
 # 3턴 미만일 때 안내 메시지
 if user_turns < 3:
-    st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.")
-    st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
+    st.info(lt("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 '다음단계로' 버튼이 활성화됩니다.", "The 'Next Step' button will be enabled after at least 3 turns of conversation with **🤓AI Friend** in the left sidebar."))
+    st.warning(lt(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!", f"Current conversation: {user_turns} turn(s) completed. Keep asking questions!"))
 
 # 조건을 만족하면 Phase3 전용 플래그 설정
 if user_turns >= 3:
@@ -695,9 +747,9 @@ if st.session_state.get("phase3_can_proceed_to_next", False) and user_turns >= 3
     # Place the button in the last column
     with col3:
         if st.button(
-            label="다음단계로",
+            label=lt("다음단계로", "Next Step"),
             icon="⏩",
-            help="돌아보기로 이동하기",
+            help=lt("돌아보기로 이동하기", "Go to Review"),
             type="primary"
         ):
             st.switch_page("pages_group/04_돌아보기.py")

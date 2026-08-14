@@ -12,19 +12,27 @@ from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 from openai import OpenAI as OpenAI_Client
 
+from i18n import ai_language_instruction, get_locale, lt, t
+from i18n.navigation import switch_to_locale_home
+from i18n.prompt_loader import load_localized_values
 from modules.multimodal import MultiModalwithHistory
 # from modules.keywords import create_keyword
 from modules.utils import overlay_png_and_np_from_image, process_png_to_bytesio, create_async_canvas_with_guaranteed_image, ensure_canvas_image_loaded
-from modules.prompts import PEER_AI_02THINK_PROMPT
+import modules.prompts as localized_prompts
 from modules.dynamo import initialize_session
 
 import dms.Intermediary as Intermediary
 
+(PEER_AI_02THINK_PROMPT,) = load_localized_values(
+    localized_prompts,
+    "PEER_AI_02THINK_PROMPT",
+)
+
 # 로그인 상태 확인
 if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error("로그인이 필요합니다. 메인 페이지에서 로그인해주세요.")
-    if st.button("메인 페이지로 이동"):
-        st.switch_page("pages_group/00_Main.py")
+    st.error(t("auth.required"))
+    if st.button(t("auth.go_main")):
+        switch_to_locale_home()
     st.stop()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
@@ -155,7 +163,7 @@ def save_draw_image(numpy_array):
         return file_path
         
     except Exception as e:
-        st.error(f"이미지 저장 중 오류가 발생했습니다: {str(e)}")
+        st.error(lt(f"이미지 저장 중 오류가 발생했습니다: {str(e)}", f"An error occurred while saving the image: {str(e)}"))
         return None
 
 
@@ -180,7 +188,7 @@ async def handle_submission_async(image_url, reason_text, system_prompt, selecte
         return response
         
     except Exception as e:
-        st.error(f"제출 처리 중 오류가 발생했습니다: {str(e)}")
+        st.error(lt(f"제출 처리 중 오류가 발생했습니다: {str(e)}", f"An error occurred while processing your submission: {str(e)}"))
         return None
 
 
@@ -221,20 +229,23 @@ initialize_session(phase_num=2)
 #--------------------------------#
 #             메인 UI             #
 #--------------------------------#
-st.set_page_config(layout="wide")
-
-st.title("생각하기 🤔")
-st.info("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.")
+st.title(lt("생각하기 🤔", "Think 🤔"))
+if get_locale() == "en":
+    st.caption(t("locale.korean_image_notice"))
+st.info(lt("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.", "- Predict the answer to the following problem and write your reasoning. \n - Draw your thoughts on the canvas below and think about why you believe that. \n - If you have questions, ask the 🤓**AI Friend** in the left sidebar."))
 
 with st.expander(
-    label="문제 보기 🔍",
+    label=lt("문제 보기 🔍", "View Problem 🔍"),
     expanded=True
     ):
     main_tab1 = st.container(border=True)
-    main_tab1.write("""우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n
+    main_tab1.write(lt("""우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n
 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 **등속 원운동**하려고 합니다. \n
 **이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.**
-""")
+""", """There is a satellite exploring outer space in search of new planets.\n
+Finally! The satellite has discovered a new planet and is entering a circular orbit around it to perform **uniform circular motion**. \n
+**At this moment, (1) draw an arrow on the canvas showing the direction of the net force acting on the satellite, and (2) write your reasoning below.**
+"""))
     with main_tab1:
         _, col1, col2, _ = st.columns([1, 3, 3, 1], vertical_alignment='center')
         col1.image(
@@ -248,12 +259,12 @@ with st.expander(
 user_turns = st.session_state.get("phase2_current_turn", 0)
 
 if user_turns < 3:
-    st.info("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 아래 정답 입력창이 열립니다.")
-    st.warning(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!")
+    st.info(lt("좌측 사이드바의 **🤓AI 친구**와 최소 3턴 이상 대화하면 아래 정답 입력창이 열립니다.", "Chat with the **🤓AI Friend** in the left sidebar for at least 3 turns to unlock the answer input below."))
+    st.warning(lt(f"현재 대화 {user_turns}턴 진행됨. 계속 질문해보세요!", f"Currently {user_turns} turn(s) completed. Keep asking questions!"))
 
 # '정답 입력하기' 버튼 (5턴 이상이 되면 활성화)
 open_btn = st.button(
-    "정답 입력하기",
+    lt("정답 입력하기", "Enter Your Answer"),
     type="primary",
     use_container_width=True,
     disabled=(user_turns < 3),
@@ -266,11 +277,11 @@ if open_btn:
 
 # 플래그가 True일 때만 캔버스와 입력칸 노출
 if st.session_state.get("show_predict_input", False):
-    st.text("문제의 답을 예상해보세요.")
-    st.text("(아래 캔버스에 생각한 내용을 그려보세요🎨)")
+    st.text(lt("문제의 답을 예상해보세요.", "Predict the answer to the problem."))
+    st.text(lt("(아래 캔버스에 생각한 내용을 그려보세요🎨)", "(Draw your thoughts on the canvas below 🎨)"))
 
     # 캔버스 이미지 미리 로딩
-    with st.spinner("캔버스 이미지를 준비 중..."):
+    with st.spinner(lt("캔버스 이미지를 준비 중...", "Preparing canvas image...")):
         ensure_canvas_image_loaded(CANVAS_IMAGE_PATH, (500, 500))
 
     # 비동기 강제 이미지 로딩 캔버스 생성 (반드시 이미지 표시)
@@ -288,11 +299,11 @@ if st.session_state.get("show_predict_input", False):
         key="canvas_intermediate_answer",
     )
 
-    st.markdown("**캔버스 사용 방법**: ⬅️실행취소(undo), ➡️다시실행(redo), 🗑️전체초기화(clear)")
+    st.markdown(lt("**캔버스 사용 방법**: ⬅️실행취소(undo), ➡️다시실행(redo), 🗑️전체초기화(clear)", "**Canvas Instructions**: ⬅️undo, ➡️redo, 🗑️clear"))
 
     reason = st.text_area(
-        label="예상의 이유를 자세히 적어보세요.",
-        placeholder="- 화살표(힘)의 방향이 어디로 향해야 할지\n- 왜 화살표(힘)의 방향이 그래야 하는지",
+        label=lt("예상의 이유를 자세히 적어보세요.", "Please write your reasoning in detail."),
+        placeholder=lt("- 화살표(힘)의 방향이 어디로 향해야 할지\n- 왜 화살표(힘)의 방향이 그래야 하는지", "- Which direction should the arrow (force) point\n- Why the arrow (force) should point in that direction"),
         height=200,
         on_change=enalble_submit_button
     )
@@ -301,7 +312,7 @@ if st.session_state.get("show_predict_input", False):
         disalble_submit_button()
 
     submit_button = st.button(
-        label="제출하기",
+        label=lt("제출하기", "Submit"),
         type="primary",
         use_container_width=True,
         disabled=st.session_state["submit_button_disabled"]
@@ -336,10 +347,16 @@ if st.session_state.get("show_predict_input", False):
                 # S3 업로드 실패해도 로컬 저장은 유지
 
         # 제출된 답변을 DB에 저장 (이미지 경로 포함)
-        submission_content = f"[제출한 답변 (이유)]: {reason}" + "\n"
+        submission_content = lt(
+            f"[제출한 답변 (이유)]: {reason}\n",
+            f"[Submitted answer (reason)]: {reason}\n",
+        )
         if saved_image_path:
             if st.session_state.get("predict_saved_image_s3_path"):
-                submission_content += f"[캔버스 이미지 S3 경로]: {st.session_state['predict_saved_image_s3_path']}"
+                submission_content += lt(
+                    f"[캔버스 이미지 S3 경로]: {st.session_state['predict_saved_image_s3_path']}",
+                    f"[Canvas image S3 path]: {st.session_state['predict_saved_image_s3_path']}",
+                )
         
         save_message_to_db(
             role="user",
@@ -348,8 +365,8 @@ if st.session_state.get("show_predict_input", False):
             turn=current_turn
         )
 
-        st.success("좌측 사이드바의 **🤓AI 친구**의 피드백을 확인해주세요!")
-        st.info("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)")
+        st.success(lt("좌측 사이드바의 **🤓AI 친구**의 피드백을 확인해주세요!", "Check the feedback from your **🤓AI Friend** in the left sidebar!"))
+        st.info(lt("정답은 '돌아보기' 단계에서 확인할 수 있습니다! 충분히 고민해봤다면, 다음 단계로 넘어가세요:)", "The answer will be revealed in the 'Review' stage! If you've thought it through, move on to the next step :)"))
 
 # Create columns with specific ratios
 col1, col2, col3 = st.columns([5, 2, 2])
@@ -357,9 +374,9 @@ col1, col2, col3 = st.columns([5, 2, 2])
 # Place the button in the last column
 with col1:
     if st.button(
-        label="이전단계로",
+        label=lt("이전단계로", "Previous Step"),
         icon="⏪",
-        help="들어가기로 이동하기",
+        help=lt("들어가기로 이동하기", "Go to Introduction"),
         type="primary"
     ):
         st.switch_page("pages_group/01_들어가기.py")
@@ -382,9 +399,9 @@ if st.session_state.get("can_proceed_to_next", False):
     # Place the button in the last column
     with col3:
         if st.button(
-            label="다음단계로",
+            label=lt("다음단계로", "Next Step"),
             icon="⏩",
-            help="실험하기로 이동하기",
+            help=lt("실험하기로 이동하기", "Go to Experiment"),
             type="primary"
         ):
             st.switch_page("pages_group/03_실험하기.py")
@@ -398,12 +415,12 @@ with st.sidebar:
     # toggle_recommended_questions = st.toggle("**💡추천 질문** 사용하기", value=False)
     # st.session_state["toggle_recommended_questions"] = toggle_recommended_questions
 
-    st.write("**AI 친구**에게 물어보기")
+    st.write(lt("**AI 친구**에게 물어보기", "Ask your **AI Friend**"))
     spinner_box = st.empty()
     messages = st.container(height=400)
 
     selected_model = "gpt-4.1"
-    system_prompt = PEER_AI_02THINK_PROMPT
+    system_prompt = PEER_AI_02THINK_PROMPT + ai_language_instruction()
 
     # 이전 대화를 출력
     def print_messages():
@@ -419,7 +436,7 @@ with st.sidebar:
 
     # 초기 대화 기록 추가
     if len(st.session_state["messages_predict"]) == 0:
-        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write("안녕! 나랑 같이 차근차근 원운동을 탐구해보자!")
+        messages.chat_message("assistant", avatar=SIDEBAR_AI_AVATAR).write(lt("안녕! 나랑 같이 차근차근 원운동을 탐구해보자!", "Hi! Let's explore circular motion together step by step!"))
     else:
         pass
 
@@ -427,7 +444,7 @@ with st.sidebar:
     print_messages()
 
     # 사용자의 입력
-    user_input = st.chat_input("궁금한 내용을 물어보세요!")
+    user_input = st.chat_input(lt("궁금한 내용을 물어보세요!", "Ask anything you're curious about!"))
 
     ## 사용자 답변 제출에 대한 추가 로직(캔버스 사용 시)
     if st.session_state.get("submission_triggered", False) and "predict_saved_image_path" in st.session_state:
@@ -438,7 +455,10 @@ with st.sidebar:
         current_turn = st.session_state["phase2_current_turn"]
 
         # 사용자의 입력
-        user_submit_input = f"(제출한 답변): {st.session_state['predict_user_reason']}"
+        user_submit_input = lt(
+            f"(제출한 답변): {st.session_state['predict_user_reason']}",
+            f"(Submitted answer): {st.session_state['predict_user_reason']}",
+        )
         messages.chat_message("user").write(user_submit_input)
 
         # 명시적으로 일반 대화 메시지를 DB에 저장 (turn 포함)
@@ -450,7 +470,7 @@ with st.sidebar:
         )
 
         # 비동기 처리를 위한 placeholder
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+        with st.spinner(lt("AI가 답변을 생성하고 있습니다...", "AI is generating a response...")):
 
             # Intermediary 로직 추가
             if st.session_state["phase2_intermediary"] is None:
@@ -522,7 +542,7 @@ with st.sidebar:
                 image_filepath = process_png_to_bytesio(st.session_state["predict_saved_image_path"])
 
                 # LLM에 전달될 사용자 프롬프트 생성
-                user_prompt_for_llm = f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}"
+                user_prompt_for_llm = lt(f"{prompt[-1]['content']}---\n\n<문제>\n - 우주 공간에 새로운 행성을 찾아 다니는 인공위성이 있습니다.\n - 드디어! 새로운 행성을 발견한 인공위성은 행성 주변의 원형 궤도에 진입하여 등속 원운동하려고 합니다.\n - 이때, 인공위성에 작용하는 (1) 알짜힘의 방향을 캔버스에 화살표로 그리고 (2) 그렇게 생각한 이유를 그 아래에 적어봅시다.\n\n 다음은 제시된 <문제>에 대해 내가 그린 캔버스 그림과 그 이유를 적은 글이야. 제출된 <그림 답안>과 글로 쓰여진 <이유>를 보고 나에게 적절한 피드백을 제공해줘\n\n <이유>: {st.session_state['predict_user_reason']}", f"{prompt[-1]['content']}---\n\n<Problem>\n - There is a satellite exploring space to find a new planet.\n - Finally! The satellite, having discovered a new planet, enters a circular orbit around the planet and attempts uniform circular motion.\n - At this point, (1) draw an arrow on the canvas indicating the direction of the net force acting on the satellite, and (2) write the reason for your answer below it.\n\n The following is my canvas drawing and written reason for the given <Problem>. Please look at the submitted <Drawing Answer> and the written <Reason> and provide me with appropriate feedback.\n\n <Reason>: {st.session_state['predict_user_reason']}")
 
                 # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
                 save_message_to_db(
@@ -553,10 +573,16 @@ with st.sidebar:
                         feedback_container.markdown(ai_feedback)
                 
                 if response:
-                    st.success("🎉 AI 친구의 피드백을 확인해보세요!")
+                    st.success(lt("🎉 AI 친구의 피드백을 확인해보세요!", "🎉 Check the feedback from your AI Friend!"))
                     
                     # 대화 기록에 추가
-                    add_message("user", f"(제출한 답변): {st.session_state['predict_user_reason']}")
+                    add_message(
+                        "user",
+                        lt(
+                            f"(제출한 답변): {st.session_state['predict_user_reason']}",
+                            f"(Submitted answer): {st.session_state['predict_user_reason']}",
+                        ),
+                    )
                     add_message("assistant", ai_feedback)
 
                     save_message_to_db(
@@ -567,11 +593,11 @@ with st.sidebar:
                         turn=current_turn
                     )
                 else:
-                    st.error("AI 답변 생성에 실패했습니다.")
+                    st.error(lt("AI 답변 생성에 실패했습니다.", "Failed to generate AI response."))
 
             except Exception as e:
                 print(e)
-                st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
+                st.error(lt(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}", f"An error occurred while generating the AI response: {str(e)}"))
 
             finally:
                 loop.close()
@@ -612,7 +638,7 @@ with st.sidebar:
             turn=current_turn
         )
 
-        with st.spinner("AI가 답변을 생성하고 있습니다..."):
+        with st.spinner(lt("AI가 답변을 생성하고 있습니다...", "AI is generating a response...")):
 
             # 사용자의 입력
             messages.chat_message("user").write(user_input)
@@ -703,7 +729,12 @@ with st.sidebar:
                 image_filepath = None
 
                 # LLM에 전달될 사용자 프롬프트 생성
-                user_prompt_for_llm = prompt[-1]['content'] + "---" + "\n\n" + "**<사용자의 입력>**:\n" + user_input
+                user_prompt_for_llm = (
+                    prompt[-1]["content"]
+                    + "---\n\n"
+                    + lt("**<사용자의 입력>**:\n", "**<User input>**:\n")
+                    + user_input
+                )
                 
                 # LLM에 전달되는 사용자 프롬프트를 DB에 저장 (turn 포함)
                 save_message_to_db(
@@ -733,7 +764,7 @@ with st.sidebar:
                         container.markdown(ai_answer)
 
                 if response:
-                    st.success("🎉 AI 친구의 피드백을 확인해보세요!")
+                    st.success(lt("🎉 AI 친구의 피드백을 확인해보세요!", "🎉 Check the feedback from your AI Friend!"))
                     # 대화기록을 저장한다.
                     add_message("user", user_input)
                     add_message("assistant", ai_answer)
@@ -746,7 +777,7 @@ with st.sidebar:
                         turn=current_turn
                     )
                 else:
-                    st.error("AI 답변 생성에 실패했습니다.")
+                    st.error(lt("AI 답변 생성에 실패했습니다.", "Failed to generate AI response."))
 
                 # if st.session_state.get("toggle_recommended_questions", True):
                 #     kw_1, kw_2 = create_keyword(st.session_state["messages_predict"])
@@ -754,6 +785,6 @@ with st.sidebar:
                 #     placeholder2.button(label=kw_2, use_container_width=True)
                 
             except Exception as e:
-                st.error(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}")
+                st.error(lt(f"AI 답변 생성 중 오류가 발생했습니다: {str(e)}", f"An error occurred while generating the AI response: {str(e)}"))
             finally:
                 loop.close()

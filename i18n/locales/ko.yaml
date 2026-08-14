@@ -1,0 +1,39 @@
+app:
+  group_title: "📚얘들아 물리 쉬워✨"
+  title: "📚얘들아 물리 쉬워 (Easy Physics)✨"
+  description: "**얘들아 물리 쉬워**는 물리 개념을 학습하고 문제를 풀어볼 수 있는 AI 기반 학습 도구입니다."
+
+navigation:
+  main: "메인 페이지 🚪"
+  introduction: "들어가기 🚀"
+  think: "생각하기 🤔"
+  experiment: "실험하기 🧪"
+  review: "돌아보기 🧐"
+  apply: "적용하기 💡"
+  language: "언어"
+
+locale:
+  en: "English"
+  ko: "한국어"
+  change_warning: "언어를 변경하면 현재 학습 세션이 종료되고 새 세션이 시작됩니다."
+  confirm: "언어 변경"
+  cancel: "취소"
+  korean_image_notice: "이 학습 이미지의 일부 내용은 한국어로만 제공됩니다."
+  korean_resource_notice: "이 외부 학습 자료는 한국어로 제공됩니다."
+
+auth:
+  username: "Username"
+  password: "Password"
+  login: "로그인"
+  invalid_username: "Username을 확인해주세요."
+  invalid_password: "Password를 확인해주세요."
+  success: "로그인 성공! 환영합니다, {username}님!"
+  required: "로그인이 필요합니다. 메인 페이지에서 로그인해주세요."
+  go_main: "메인 페이지로 이동"
+
+common:
+  submit: "제출"
+  next: "다음"
+  previous: "이전"
+  loading: "불러오는 중..."
+  error: "오류가 발생했습니다: {error}"

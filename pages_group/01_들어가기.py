@@ -4,19 +4,15 @@ import pandas as pd
 
 from openai import OpenAI
 
-from i18n import ai_language_instruction, get_locale, lt, t
+from i18n import ai_language_instruction, get_locale, lt
 from i18n.assets import localized_image_path
-from i18n.navigation import switch_to_locale_home
+from i18n.session import ensure_learning_session
 from modules.dynamo import initialize_session
 
 # from langchain_teddynote import logging
 
-# 로그인 상태 확인
-if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error(t("auth.required"))
-    if st.button(t("auth.go_main")):
-        switch_to_locale_home()
-    st.stop()
+# Allow direct entry to every learning step without authentication.
+ensure_learning_session()
 
 os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
 os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]

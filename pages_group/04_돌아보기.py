@@ -14,9 +14,9 @@ from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 from openai import OpenAI as OpenAI_Client
 
-from i18n import ai_language_instruction, get_locale, lt, t
+from i18n import ai_language_instruction, get_locale, lt
 from i18n.assets import localized_image_path
-from i18n.navigation import switch_to_locale_home
+from i18n.session import ensure_learning_session
 from i18n.prompt_loader import load_localized_values
 from modules.multimodal import MultiModalwithHistory
 import modules.prompts as localized_prompts
@@ -30,12 +30,8 @@ import dms.Intermediary as Intermediary
     "TUTOR_AI_04REFLECT_PROMPT",
 )
 
-# 로그인 상태 확인
-if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error(t("auth.required"))
-    if st.button(t("auth.go_main")):
-        switch_to_locale_home()
-    st.stop()
+# Allow direct entry to every learning step without authentication.
+ensure_learning_session()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 

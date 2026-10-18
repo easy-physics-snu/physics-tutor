@@ -16,7 +16,7 @@ import uuid
 from openai import OpenAI
 
 from i18n import ai_language_instruction, get_locale, lt, t
-from i18n.navigation import switch_to_locale_home
+from i18n.session import ensure_learning_session
 # DynamoDB 관련 import 추가
 from modules.dynamo import initialize_session
 from modules.evaluation import (
@@ -25,12 +25,8 @@ from modules.evaluation import (
     parse_application_evaluation,
 )
 
-# 로그인 상태 확인
-if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error(t("auth.required"))
-    if st.button(t("auth.go_main")):
-        switch_to_locale_home()
-    st.stop()
+# Allow direct entry to every learning step without authentication.
+ensure_learning_session()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 

@@ -7,7 +7,7 @@ from i18n.assets import LOCALIZED_IMAGES, localized_image_path
 from i18n.catalog import load_catalog, translate
 from i18n import ai_language_instruction
 from i18n.locale import DEFAULT_LOCALE, get_locale, normalize_locale, set_locale
-from i18n.session import reset_learning_session
+from i18n.session import ensure_learning_session, reset_learning_session
 from i18n.simulation import localize_simulation_html
 from modules.evaluation import (
     build_application_evaluation_prompt,
@@ -56,38 +56,59 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(translate("missing.key", "ko"), "[missing.key]")
 
 
-class SessionResetTests(unittest.TestCase):
-    def test_reset_preserves_auth_and_starts_a_new_session(self):
-        state = {
-            "logged_in": True,
-            "username": "student",
-            "user_id": "student-1",
-            "api_key": "secret",
-            "locale": "en",
-            "locale_selector": "en",
-            "session_uuid": "old-session",
-            "chat_history": ["old learning state"],
-            "current_phase": 3,
-        }
+class LearningSessionTests(unittest.TestCase):
+    def test_first_visit_creates_identifiers_without_login(self):
+        state = {}
+        session_id = ensure_learning_session(state)
+        self.assertTrue(state["user_id"].startswith("anonymous-"))
+        self.assertEqual(state["session_uuid"], session_id)
+        self.assertEqual(state["session_id"], session_id)
+        self.assertNotIn("logged_in", state)
+        self.assertNotIn("username", state)
 
+    def test_reruns_and_page_changes_reuse_identifiers(self):
+        state = {}
+        session_id = ensure_learning_session(state)
+        user_id = state["user_id"]
+        state["draft"] = "answer"
+        self.assertEqual(ensure_learning_session(state), session_id)
+        self.assertEqual(state["user_id"], user_id)
+        self.assertEqual(state["draft"], "answer")
+
+    def test_separate_visitors_get_separate_identifiers(self):
+        first, second = {}, {}
+        self.assertNotEqual(ensure_learning_session(first), ensure_learning_session(second))
+        self.assertNotEqual(first["user_id"], second["user_id"])
+
+    def test_empty_legacy_identifiers_are_repaired(self):
+        state = {"logged_in": False, "user_id": None, "session_uuid": None,
+                 "session_id": "stale"}
+        session_id = ensure_learning_session(state)
+        self.assertTrue(state["user_id"].startswith("anonymous-"))
+        self.assertEqual(state["session_id"], session_id)
+
+    def test_language_reset_preserves_identity_and_clears_learning(self):
+        state = {"api_key": "test-key", "locale": "en"}
+        old_session = ensure_learning_session(state)
+        user_id = state["user_id"]
+        state.update({"chat_history": ["old answer"], "current_phase": 3,
+                      "pending_locale": "ko"})
         new_session = reset_learning_session("ko", state)
-
-        self.assertIsNotNone(new_session)
-        self.assertNotEqual(new_session, "old-session")
+        self.assertNotEqual(new_session, old_session)
         self.assertEqual(state["session_uuid"], new_session)
         self.assertEqual(state["session_id"], new_session)
+        self.assertEqual(state["user_id"], user_id)
+        self.assertEqual(state["api_key"], "test-key")
         self.assertEqual(state["locale"], "ko")
         self.assertEqual(state["locale_selector"], "ko")
-        self.assertEqual(state["username"], "student")
-        self.assertEqual(state["user_id"], "student-1")
-        self.assertEqual(state["api_key"], "secret")
         self.assertNotIn("chat_history", state)
         self.assertNotIn("current_phase", state)
+        self.assertNotIn("pending_locale", state)
 
-    def test_reset_does_not_create_an_anonymous_learning_session(self):
-        state = {"logged_in": False, "session_uuid": "old", "draft": "answer"}
-        self.assertIsNone(reset_learning_session("en", state))
-        self.assertIsNone(state["session_uuid"])
+    def test_reset_also_works_before_first_visit(self):
+        state = {"draft": "answer"}
+        self.assertTrue(reset_learning_session("en", state))
+        self.assertTrue(state["user_id"].startswith("anonymous-"))
         self.assertNotIn("draft", state)
 
 

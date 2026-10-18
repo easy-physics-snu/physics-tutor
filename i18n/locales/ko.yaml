@@ -4,7 +4,6 @@ app:
   description: "**얘들아 물리 쉬워**는 물리 개념을 학습하고 문제를 풀어볼 수 있는 AI 기반 학습 도구입니다."
 
 navigation:
-  main: "메인 페이지 🚪"
   introduction: "들어가기 🚀"
   think: "생각하기 🤔"
   experiment: "실험하기 🧪"
@@ -20,16 +19,6 @@ locale:
   cancel: "취소"
   korean_image_notice: "이 학습 이미지의 일부 내용은 한국어로만 제공됩니다."
   korean_resource_notice: "이 외부 학습 자료는 한국어로 제공됩니다."
-
-auth:
-  username: "Username"
-  password: "Password"
-  login: "로그인"
-  invalid_username: "Username을 확인해주세요."
-  invalid_password: "Password를 확인해주세요."
-  success: "로그인 성공! 환영합니다, {username}님!"
-  required: "로그인이 필요합니다. 메인 페이지에서 로그인해주세요."
-  go_main: "메인 페이지로 이동"
 
 common:
   submit: "제출"

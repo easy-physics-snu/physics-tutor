@@ -12,8 +12,8 @@ from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 from openai import OpenAI as OpenAI_Client
 
-from i18n import ai_language_instruction, get_locale, lt, t
-from i18n.navigation import switch_to_locale_home
+from i18n import ai_language_instruction, get_locale, lt
+from i18n.session import ensure_learning_session
 from i18n.prompt_loader import load_localized_values
 from modules.multimodal import MultiModalwithHistory
 # from modules.keywords import create_keyword
@@ -28,12 +28,8 @@ import dms.Intermediary as Intermediary
     "PEER_AI_02THINK_PROMPT",
 )
 
-# 로그인 상태 확인
-if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error(t("auth.required"))
-    if st.button(t("auth.go_main")):
-        switch_to_locale_home()
-    st.stop()
+# Allow direct entry to every learning step without authentication.
+ensure_learning_session()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -230,8 +226,6 @@ initialize_session(phase_num=2)
 #             메인 UI             #
 #--------------------------------#
 st.title(lt("생각하기 🤔", "Think 🤔"))
-if get_locale() == "en":
-    st.caption(t("locale.korean_image_notice"))
 st.info(lt("- 다음 문제 상황의 정답을 예상해보고, 그 예상의 이유를 적어봅시다. \n - 하단의 캔버스에 그림을 그려보고, 그렇게 생각한 이유를 생각해보세요. \n - 궁금한게 있으면 좌측 사이드바의 🤓**AI 친구**에게 물어보세요.", "- Predict the answer to the following problem and write your reasoning. \n - Draw your thoughts on the canvas below and think about why you believe that. \n - If you have questions, ask the 🤓**AI Friend** in the left sidebar."))
 
 with st.expander(

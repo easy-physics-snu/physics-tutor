@@ -14,8 +14,9 @@ from langchain_core.messages.chat import ChatMessage
 from langchain_openai import ChatOpenAI
 from openai import OpenAI as OpenAI_Client
 
-from i18n import ai_language_instruction, get_locale, lt, t
-from i18n.navigation import switch_to_locale_home
+from i18n import ai_language_instruction, get_locale, lt
+from i18n.assets import localized_image_path
+from i18n.session import ensure_learning_session
 from i18n.prompt_loader import load_localized_values
 from modules.multimodal import MultiModalwithHistory
 import modules.prompts as localized_prompts
@@ -29,12 +30,8 @@ import dms.Intermediary as Intermediary
     "TUTOR_AI_04REFLECT_PROMPT",
 )
 
-# 로그인 상태 확인
-if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error(t("auth.required"))
-    if st.button(t("auth.go_main")):
-        switch_to_locale_home()
-    st.stop()
+# Allow direct entry to every learning step without authentication.
+ensure_learning_session()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -360,8 +357,6 @@ async def handle_submission_async(image_url, reason_text, system_prompt, selecte
 
 
 st.title(lt("돌아보기 🧐", "Review 🧐"))
-if get_locale() == "en":
-    st.caption(t("locale.korean_image_notice"))
 
 # Create a container for the info message and tooltip
 info_container = st.container()
@@ -687,8 +682,8 @@ At last! The satellite has discovered a new planet and is about to enter a circu
             img[src*="find_answer_guide.png"],
             img[alt*="find_answer_guide"],
             div img[src*="find_answer_guide.png"] {
-                width: 50% !important;
-                max-width: 50% !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 height: auto !important;
                 max-height: none !important;
                 object-fit: contain !important;
@@ -698,7 +693,7 @@ At last! The satellite has discovered a new planet and is about to enter a circu
             unsafe_allow_html=True
         )
         
-        st.image("src/images/find_answer_guide.png", caption=lt("'문제 정답' 탭 위치", "Location of the 'Answer / Explanation' tab"), use_container_width=False)
+        st.image(localized_image_path("src/images/find_answer_guide.png"), caption=lt("'문제 정답' 탭 위치", "Location of the 'Answer / Explanation' tab"), use_container_width=True)
 
 
 with tab2:
@@ -706,7 +701,7 @@ with tab2:
     if "explanation_saved_image_path" in st.session_state and "explanation_user_reason" in st.session_state:
         togle.empty()
         st.subheader(lt("문제 정답", "Answer / Explanation"))
-        st.image(REVIEW_IMAGE_PATH)
+        st.image(localized_image_path(REVIEW_IMAGE_PATH))
         # st.write(st.session_state)
         st.session_state["show_answer"] = True
     else:
@@ -768,7 +763,7 @@ with st.sidebar:
                 ai_info.empty()
                 togle.empty()
                 st.subheader(lt("문제 정답", "Answer / Explanation"))
-                st.image(REVIEW_IMAGE_PATH)
+                st.image(localized_image_path(REVIEW_IMAGE_PATH))
                 # st.write(st.session_state)
                 st.session_state["show_answer"] = True
             else:

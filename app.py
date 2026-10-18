@@ -1,6 +1,7 @@
 import streamlit as st
 
 from i18n import DEFAULT_LOCALE, get_locale, reset_learning_session, set_locale, t
+from i18n.session import ensure_learning_session
 
 
 st.set_page_config(layout="wide")
@@ -9,7 +10,7 @@ initial_locale = get_locale()
 
 root_page = st.Page(
     "pages_group/locale_default.py",
-    title=t("navigation.main"),
+    title=t("navigation.introduction"),
     default=True,
 )
 en_page = st.Page(
@@ -61,20 +62,22 @@ all_pages = [
 
 pg = st.navigation(all_pages, position="hidden")
 
-if pg.url_path in {"en", "ko"} and pg.url_path != initial_locale:
-    if st.session_state.get("logged_in") and st.session_state.get("session_uuid"):
-        reset_learning_session(pg.url_path)
+entry_locale = {"": DEFAULT_LOCALE, "en": "en", "ko": "ko"}.get(pg.url_path)
+if entry_locale is not None and entry_locale != initial_locale:
+    if st.session_state.get("session_uuid"):
+        reset_learning_session(entry_locale)
     else:
-        set_locale(pg.url_path)
-    st.session_state["locale_selector"] = pg.url_path
+        set_locale(entry_locale)
+    st.session_state["locale_selector"] = entry_locale
     st.rerun()
 
 set_locale(st.session_state.get("locale", DEFAULT_LOCALE))
 
-if pg.url_path == "":
+if entry_locale is not None:
     pg.run()
     st.stop()
 
+ensure_learning_session()
 current_locale = get_locale()
 st.session_state.setdefault("locale_selector", current_locale)
 
@@ -87,7 +90,7 @@ with st.sidebar:
     )
 
     if selected_locale != current_locale:
-        if st.session_state.get("logged_in") and st.session_state.get("session_uuid"):
+        if st.session_state.get("session_uuid"):
             st.session_state["pending_locale"] = selected_locale
         else:
             set_locale(selected_locale)
@@ -107,8 +110,6 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(f"**{t('app.group_title')}**")
-    home_page = en_page if current_locale == "en" else ko_page
-    st.page_link(home_page, label=t("navigation.main"))
     st.page_link(introduction_page, label=t("navigation.introduction"))
     st.page_link(think_page, label=t("navigation.think"))
     st.page_link(experiment_page, label=t("navigation.experiment"))

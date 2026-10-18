@@ -1,4 +1,5 @@
-import streamlit as st
+from i18n import DEFAULT_LOCALE
+from i18n.navigation import enter_introduction
 
 
-st.switch_page("pages_group/locale_en.py")
+enter_introduction(DEFAULT_LOCALE)

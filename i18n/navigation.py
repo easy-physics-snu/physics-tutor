@@ -1,17 +1,16 @@
-from i18n.locale import get_locale
+from i18n.locale import get_locale, normalize_locale, set_locale
+from i18n.session import ensure_learning_session, reset_learning_session
 
 
-LOCALE_ENTRY_PATHS = {
-    "en": "pages_group/locale_en.py",
-    "ko": "pages_group/locale_ko.py",
-}
-
-
-def locale_entry_path(locale: str | None = None) -> str:
-    return LOCALE_ENTRY_PATHS[get_locale() if locale is None else locale]
-
-
-def switch_to_locale_home() -> None:
+def enter_introduction(locale: str) -> None:
+    """Resolve language entry URLs to the first learning step."""
     import streamlit as st
 
-    st.switch_page(locale_entry_path())
+    target_locale = normalize_locale(locale)
+    if get_locale() != target_locale and st.session_state.get("session_uuid"):
+        reset_learning_session(target_locale)
+    else:
+        set_locale(target_locale)
+    st.session_state["locale_selector"] = target_locale
+    ensure_learning_session()
+    st.switch_page("pages_group/01_들어가기.py")

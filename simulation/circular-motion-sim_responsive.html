@@ -457,8 +457,9 @@
     }
 
     function updateStatus() {
-      velocityMagDisplay.textContent = velocityMag.toFixed(2);
-      velocityAngleDisplay.textContent = velocityAngle.toFixed(0) + '°';
+      // The optional status panel may be hidden from the page.
+      if (velocityMagDisplay) velocityMagDisplay.textContent = velocityMag.toFixed(2);
+      if (velocityAngleDisplay) velocityAngleDisplay.textContent = velocityAngle.toFixed(0) + '°';
     }
 
     function draw() {

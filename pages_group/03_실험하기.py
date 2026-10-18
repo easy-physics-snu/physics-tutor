@@ -28,8 +28,8 @@ from langchain_openai import ChatOpenAI
 # from modules.keywords import create_keyword
 # import simulation.simulation as simulation
 
-from i18n import ai_language_instruction, get_locale, lt, t
-from i18n.navigation import switch_to_locale_home
+from i18n import ai_language_instruction, get_locale, lt
+from i18n.session import ensure_learning_session
 from i18n.prompt_loader import load_localized_values
 from i18n.simulation import localize_simulation_html
 import modules.prompts as localized_prompts
@@ -43,12 +43,8 @@ import dms.Intermediary as Intermediary
 
 set_verbose(False)
 
-# 로그인 상태 확인
-if "logged_in" not in st.session_state or not st.session_state.logged_in or st.session_state.get("user_id") is None:
-    st.error(t("auth.required"))
-    if st.button(t("auth.go_main")):
-        switch_to_locale_home()
-    st.stop()
+# Allow direct entry to every learning step without authentication.
+ensure_learning_session()
 
 st.session_state.api_key = st.secrets["openai_api_key"]
 
@@ -209,8 +205,6 @@ def save_message_to_db(role: str, content: str, content_type: str = "text", llm_
 ########### Mainpage Logic ###########
 ######################################
 st.title(lt("실험하기 🧪", "Experiment 🧪"))
-if get_locale() == "en":
-    st.caption(t("locale.korean_image_notice"))
 
 # Create a container for the info message and tooltip
 info_container = st.container()

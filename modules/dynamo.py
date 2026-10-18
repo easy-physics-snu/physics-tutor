@@ -10,6 +10,7 @@ from decimal import Decimal
 import streamlit as st
 
 from i18n import get_locale, lt
+from i18n.session import ensure_learning_session
 
 class DynamoDBManager:
     """DynamoDB 관리 클래스"""
@@ -533,15 +534,14 @@ def initialize_session(phase_num: int):
     Args:
         phase_num: Phase 번호 (1-5)
     """
+    # Create identifiers before AWS calls, including direct page entry.
+    ensure_learning_session()
+
     # 1. AWS 서비스 초기화
     initialize_aws_services()
     
     # 2. PhaseManager 보장 (핵심!)
     ensure_phase_manager(phase_num)
-    
-    # 3. Session UUID 생성 (단순 처리)
-    if "session_uuid" not in st.session_state:
-        st.session_state["session_uuid"] = str(uuid.uuid4())
     
     # 4. 세션 생성/조회
     session_manager = st.session_state.get("session_manager")

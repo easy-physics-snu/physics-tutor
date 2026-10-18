@@ -209,8 +209,6 @@ def save_message_to_db(role: str, content: str, content_type: str = "text", llm_
 ########### Mainpage Logic ###########
 ######################################
 st.title(lt("실험하기 🧪", "Experiment 🧪"))
-if get_locale() == "en":
-    st.caption(t("locale.korean_image_notice"))
 
 # Create a container for the info message and tooltip
 info_container = st.container()

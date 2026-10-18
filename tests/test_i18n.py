@@ -1,5 +1,9 @@
 import unittest
+from pathlib import Path
+from html.parser import HTMLParser
+import re
 
+from i18n.assets import LOCALIZED_IMAGES, localized_image_path
 from i18n.catalog import load_catalog, translate
 from i18n import ai_language_instruction
 from i18n.locale import DEFAULT_LOCALE, get_locale, normalize_locale, set_locale
@@ -98,6 +102,55 @@ class SimulationTests(unittest.TestCase):
         self.assertIn("Circular Motion Force Direction", english_html)
         self.assertIn(">Run</button>", english_html)
         self.assertEqual(localize_simulation_html(korean_html, "ko"), korean_html)
+
+
+class LearningAssetTests(unittest.TestCase):
+    def test_all_localized_assets_exist_and_originals_are_preserved(self):
+        root = Path(__file__).resolve().parents[1]
+        for name in LOCALIZED_IMAGES:
+            original = f"src/images/{name}"
+            with self.subTest(name=name):
+                self.assertEqual(localized_image_path(original, "ko"), original)
+                english = localized_image_path(original, "en")
+                self.assertEqual(english, f"src/images/en/{name}")
+                self.assertTrue((root / original).is_file())
+                self.assertTrue((root / english).is_file())
+
+    def test_neutral_and_user_images_are_not_redirected(self):
+        for path in ("src/images/satellite_orbit_canvas.png",
+                     "src/images/satellite_moon.png",
+                     "src/draw_images/explain_2.png"):
+            self.assertEqual(localized_image_path(path, "en"), path)
+
+
+class FullSimulationTests(unittest.TestCase):
+    def test_real_simulation_has_no_korean_visible_or_dynamic_text(self):
+        class ContentParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.text = []
+                self.attributes = []
+
+            def handle_data(self, data):
+                self.text.append(data)
+
+            def handle_starttag(self, tag, attrs):
+                self.attributes.extend(value or "" for _, value in attrs)
+
+        root = Path(__file__).resolve().parents[1]
+        korean = (root / "simulation/circular-motion-sim_responsive.html").read_text()
+        english = localize_simulation_html(korean, "en")
+        self.assertEqual(localize_simulation_html(korean, "ko"), korean)
+        parser = ContentParser()
+        parser.feed(english)
+        # Include JavaScript strings, excluding source-code comments.
+        content = "\n".join(parser.text + parser.attributes)
+        content = re.sub(r"/\*.*?\*/", "", content, flags=re.S)
+        content = re.sub(r"//[^\n]*", "", content)
+        self.assertIsNone(re.search(r"[가-힣]", content))
+        self.assertIn("runBtn.textContent = 'Run'", english)
+        self.assertIn("runBtn.textContent = 'Stop'", english)
+        self.assertIn("Velocity Direction:", english)
 
 
 class EvaluationTests(unittest.TestCase):

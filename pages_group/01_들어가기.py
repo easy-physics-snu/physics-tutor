@@ -5,6 +5,7 @@ import pandas as pd
 from openai import OpenAI
 
 from i18n import ai_language_instruction, get_locale, lt, t
+from i18n.assets import localized_image_path
 from i18n.navigation import switch_to_locale_home
 from modules.dynamo import initialize_session
 
@@ -115,8 +116,6 @@ initialize_session(phase_num=1)
 ########### Mainpage Logic ###########
 ######################################
 st.title(lt("들어가기 🚀", "Introduction 🚀"))
-if get_locale() == "en":
-    st.caption(t("locale.korean_image_notice"))
 
 st.subheader(lt("오늘 배울 물리 개념은?", "What physics concepts will we learn today?"))
 st.info(lt("- 먼저 **[1. 여러 가지 운동]** 과 **[2. 힘과 운동]** 소단원에서 배운 내용을 복습해봅시다:) \n - 아래 2개 탭을 모두 마치고 다음 단계로 넘어가주세요!", "- First, let's review what we learned in **[1. Various Types of Motion]** and **[2. Force and Motion]** :) \n - Please complete both tabs below before moving on to the next step!"))
@@ -131,8 +130,8 @@ st.markdown(
     img[src*="find_tab_guide.png"],
     img[alt*="find_tab_guide"],
     div img[src*="find_tab_guide.png"] {
-        width: 30% !important;
-        max-width: 30% !important;
+        width: 100% !important;
+        max-width: 100% !important;
         height: auto !important;
         max-height: none !important;
         object-fit: contain !important;
@@ -142,7 +141,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.image("src/images/find_tab_guide.png", use_container_width=False)
+st.image(localized_image_path("src/images/find_tab_guide.png"), use_container_width=True)
 
 # 탭 텍스트 크기 조정
 st.markdown(
@@ -578,8 +577,8 @@ with tab1:
         st.subheader(lt("**핵심 정리!**", "**Key Summary!**"))
         st.info(lt("속력이 변하는 운동, 운동 방향이 변하는 운동, 속력과 운동 방향이 모두 변하는 운동은 모두 **가속도 운동**이다.", "Motion where speed changes, motion where direction changes, and motion where both speed and direction change are all **accelerated motion**."))
         st.image(
-            "src/images/explain_2.png",
-            caption=lt("출처: 미래엔 교과서", "Source: Mirae-N textbook (Korean)"),
+            localized_image_path("src/images/explain_2.png"),
+            caption=lt("출처: 미래엔 교과서", "Adapted from Mirae-N textbook; English translation"),
         )
 
         # tab1 완료 시 다음 tab으로 안내
@@ -947,7 +946,7 @@ Feedback: [Write within three sentences]""")
                             # Q3 이미지(explain_5.png)일 때만 스크롤 안내 표시
                             if "explain_5.png" in message["image"]:
                                 st.caption(lt("💡 아래로 스크롤하여 전체 내용을 확인하세요 ⬇️", "💡 Scroll down to see the full content ⬇️"))
-                            st.image(message["image"], use_container_width=True, caption=lt("출처: 미래엔 교과서", "Source: Mirae-N Textbook"))
+                            st.image(localized_image_path(message["image"]), use_container_width=True, caption=lt("출처: 미래엔 교과서", "Adapted from Mirae-N textbook; English translation"))
             else:
                 with chat_container.chat_message(message["role"]):
                     st.write(message["content"])
